@@ -17,6 +17,7 @@ st.title("🏗️ LOGISTICA DE ENVIO FERRETERIA & HOMECENTER EL INDIO")
 st.markdown("Sincronizado con tu Dashboard profesional en Google Drive.")
 
 
+# Función de conexión blindada contra errores de padding
 @st.cache_resource
 def conectar_google_sheets():
   scope = [
@@ -25,11 +26,14 @@ def conectar_google_sheets():
   ]
 
   if "gcp_service_account" in st.secrets:
+    # Convertimos los secretos a un diccionario limpio garantizando el salto de línea real
     secret_dict = dict(st.secrets["gcp_service_account"])
     if "private_key" in secret_dict:
       pk = str(secret_dict["private_key"])
+      # Normalizamos los saltos de línea de la llave privada
       pk = pk.replace("\\n", "\n")
-      pk = pk.strip('"').strip("'")
+      if not pk.endswith("\n"):
+        pk += "\n"
       secret_dict["private_key"] = pk
 
     creds = ServiceAccountCredentials.from_json_keyfile_dict(
