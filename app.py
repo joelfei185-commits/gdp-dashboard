@@ -17,7 +17,7 @@ st.title("🏗️ LOGISTICA DE ENVIO FERRETERIA & HOMECENTER EL INDIO")
 st.markdown("Sincronizado con tu Dashboard profesional en Google Drive.")
 
 
-# Función inteligente para conectar a Google Sheets usando la librería oficial de Google
+# Función inteligente para conectar a Google Sheets con limpieza de formato PEM
 @st.cache_resource
 def conectar_google_sheets():
   scope = [
@@ -27,6 +27,10 @@ def conectar_google_sheets():
 
   if "gcp_service_account" in st.secrets:
     secret_dict = dict(st.secrets["gcp_service_account"])
+    if "private_key" in secret_dict:
+      secret_dict["private_key"] = secret_dict["private_key"].replace(
+          "\\n", "\n"
+      )
     creds = service_account.Credentials.from_service_account_info(
         secret_dict, scopes=scope
     )
