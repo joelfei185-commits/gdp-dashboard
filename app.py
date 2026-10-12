@@ -1,7 +1,8 @@
 from datetime import datetime, timedelta
 import json
 import math
-from oauth2client.service_account import ServiceAccountCredentials
+import tempfile
+from google.oauth2 import service_account
 import gspread
 import pandas as pd
 import streamlit as st
@@ -17,7 +18,7 @@ st.title("🏗️ LOGISTICA DE ENVIO FERRETERIA & HOMECENTER EL INDIO")
 st.markdown("Sincronizado con tu Dashboard profesional en Google Drive.")
 
 
-# Función de conexión blindada contra errores de padding
+# Función de conexión blindada usando archivo temporal seguro
 @st.cache_resource
 def conectar_google_sheets():
   scope = [
@@ -26,22 +27,26 @@ def conectar_google_sheets():
   ]
 
   if "gcp_service_account" in st.secrets:
-    # Convertimos los secretos a un diccionario limpio garantizando el salto de línea real
+    # Convertimos los secretos a un diccionario y corregimos los saltos de línea de la llave
     secret_dict = dict(st.secrets["gcp_service_account"])
     if "private_key" in secret_dict:
-      pk = str(secret_dict["private_key"])
-      # Normalizamos los saltos de línea de la llave privada
-      pk = pk.replace("\\n", "\n")
-      if not pk.endswith("\n"):
-        pk += "\n"
-      secret_dict["private_key"] = pk
+      secret_dict["private_key"] = secret_dict["private_key"].replace(
+          "\\n", "\n"
+      )
 
-    creds = ServiceAccountCredentials.from_json_keyfile_dict(
-        secret_dict, scope
+    # Creamos un archivo temporal JSON para que Google Auth lo lea de forma 100% nativa sin errores de padding
+    with tempfile.NamedTemporaryFile(
+        mode="w", delete=False, suffix=".json"
+    ) as f:
+      json.dump(secret_dict, f)
+      temp_filename = f.name
+
+    creds = service_account.Credentials.from_service_account_file(
+        temp_filename, scopes=scope
     )
   else:
-    creds = ServiceAccountCredentials.from_json_keyfile_name(
-        "credentials.json", scope
+    creds = service_account.Credentials.from_service_account_file(
+        "credentials.json", scopes=scope
     )
 
   client = gspread.authorize(creds)
