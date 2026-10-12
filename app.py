@@ -19,7 +19,7 @@ st.title("🏗️ LOGISTICA DE ENVIO FERRETERIA & HOMECENTER EL INDIO")
 st.markdown("Sincronizado con tu Dashboard profesional en Google Drive.")
 
 
-# Función de conexión directa mediante el archivo credentials.json del repositorio
+# Función de conexión con tolerancia de reloj para evitar errores JWT
 @st.cache_resource
 def conectar_google_sheets():
   scope = [
@@ -27,13 +27,14 @@ def conectar_google_sheets():
       "https://www.googleapis.com/auth/drive",
   ]
 
-  # Leemos directamente el archivo local credentials.json incluido en el repositorio
+  skew = timedelta(seconds=10)
+
   if os.path.exists("credentials.json"):
     creds = service_account.Credentials.from_service_account_file(
         "credentials.json", scopes=scope
     )
+    creds._clock_skew = skew
   elif "gcp_service_account" in st.secrets:
-    # Respaldo por si se configuraron los secretos correctamente en formato plano
     sec = st.secrets["gcp_service_account"]
     secret_dict = {
         "type": str(sec.get("type", "service_account")),
@@ -57,17 +58,14 @@ def conectar_google_sheets():
         "client_x509_cert_url": str(sec.get("client_x509_cert_url", "")),
     }
 
-    with tempfile.NamedTemporaryFile(
-        mode="w", delete=False, suffix=".json", encoding="utf-8"
-    ) as f:
-      json.dump(secret_dict, f)
-      temp_filename = f.name
-
-    creds = service_account.Credentials.from_service_account_file(
-        temp_filename, scopes=scope
+    creds = service_account.Credentials.from_service_account_info(
+        secret_dict, scopes=scope
     )
+    creds._clock_skew = skew
   else:
-    raise FileNotFoundError("No se encontró el archivo credentials.json")
+    raise FileNotFoundError(
+        "No se encontró el archivo credentials.json ni los secretos configurados."
+    )
 
   client = gspread.authorize(creds)
   return client.open("CALCULO DE MATERIALES MAC")
