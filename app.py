@@ -1,8 +1,6 @@
 from datetime import datetime, timedelta
-import json
 import math
 import os
-import tempfile
 from google.oauth2 import service_account
 import gspread
 import pandas as pd
@@ -19,7 +17,7 @@ st.title("🏗️ LOGISTICA DE ENVIO FERRETERIA & HOMECENTER EL INDIO")
 st.markdown("Sincronizado con tu Dashboard profesional en Google Drive.")
 
 
-# Función de conexión con formateo estricto de la llave privada para evitar error JWT
+# Función de conexión directa utilizando el archivo físico credentials.json del repositorio
 @st.cache_resource
 def conectar_google_sheets():
   scope = [
@@ -27,57 +25,15 @@ def conectar_google_sheets():
       "https://www.googleapis.com/auth/drive",
   ]
 
+  # Verificamos que el archivo credentials.json exista en la raíz del proyecto en GitHub
   if os.path.exists("credentials.json"):
     creds = service_account.Credentials.from_service_account_file(
         "credentials.json", scopes=scope
     )
-  elif "gcp_service_account" in st.secrets:
-    sec = st.secrets["gcp_service_account"]
-
-    # Limpieza y estructuración obligatoria de la llave privada
-    pk = str(sec.get("private_key", ""))
-    pk = pk.replace("\\n", "\n")
-    if "-----BEGIN PRIVATE KEY-----" in pk and not pk.startswith(
-        "-----BEGIN PRIVATE KEY-----\n"
-    ):
-      pk = pk.replace(
-          "-----BEGIN PRIVATE KEY-----", "-----BEGIN PRIVATE KEY-----\n"
-      )
-    if "-----END PRIVATE KEY-----" in pk and not pk.endswith(
-        "\n-----END PRIVATE KEY-----\n"
-    ):
-      pk = pk.replace(
-          "-----END PRIVATE KEY-----", "\n-----END PRIVATE KEY-----\n"
-      )
-
-    secret_dict = {
-        "type": str(sec.get("type", "service_account")),
-        "project_id": str(sec.get("project_id", "")),
-        "private_key_id": str(sec.get("private_key_id", "")),
-        "private_key": pk,
-        "client_email": str(sec.get("client_email", "")),
-        "client_id": str(sec.get("client_id", "")),
-        "auth_uri": str(
-            sec.get("auth_uri", "https://accounts.google.com/o/oauth2/auth")
-        ),
-        "token_uri": str(
-            sec.get("token_uri", "https://oauth2.googleapis.com/token")
-        ),
-        "auth_provider_x509_cert_url": str(
-            sec.get(
-                "auth_provider_x509_cert_url",
-                "https://www.googleapis.com/oauth2/v1/certs",
-            )
-        ),
-        "client_x509_cert_url": str(sec.get("client_x509_cert_url", "")),
-    }
-
-    creds = service_account.Credentials.from_service_account_info(
-        secret_dict, scopes=scope
-    )
   else:
     raise FileNotFoundError(
-        "No se encontró el archivo credentials.json ni los secretos configurados."
+        "No se encontró el archivo credentials.json en el repositorio de GitHub."
+        " Por favor súbelo a la raíz."
     )
 
   client = gspread.authorize(creds)
