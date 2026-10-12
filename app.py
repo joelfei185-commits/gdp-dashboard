@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 import json
 import math
-from google.oauth2 import service_account
+from oauth2client.service_account import ServiceAccountCredentials
 import gspread
 import pandas as pd
 import streamlit as st
@@ -17,7 +17,6 @@ st.title("🏗️ LOGISTICA DE ENVIO FERRETERIA & HOMECENTER EL INDIO")
 st.markdown("Sincronizado con tu Dashboard profesional en Google Drive.")
 
 
-# Función inteligente para conectar a Google Sheets con limpieza de formato PEM
 @st.cache_resource
 def conectar_google_sheets():
   scope = [
@@ -28,15 +27,17 @@ def conectar_google_sheets():
   if "gcp_service_account" in st.secrets:
     secret_dict = dict(st.secrets["gcp_service_account"])
     if "private_key" in secret_dict:
-      secret_dict["private_key"] = secret_dict["private_key"].replace(
-          "\\n", "\n"
-      )
-    creds = service_account.Credentials.from_service_account_info(
-        secret_dict, scopes=scope
+      pk = str(secret_dict["private_key"])
+      pk = pk.replace("\\n", "\n")
+      pk = pk.strip('"').strip("'")
+      secret_dict["private_key"] = pk
+
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(
+        secret_dict, scope
     )
   else:
-    creds = service_account.Credentials.from_service_account_file(
-        "credentials.json", scopes=scope
+    creds = ServiceAccountCredentials.from_json_keyfile_name(
+        "credentials.json", scope
     )
 
   client = gspread.authorize(creds)
