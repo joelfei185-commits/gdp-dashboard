@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 import json
 import math
+import os
 import tempfile
 from google.oauth2 import service_account
 import gspread
@@ -18,6 +19,7 @@ st.title("🏗️ LOGISTICA DE ENVIO FERRETERIA & HOMECENTER EL INDIO")
 st.markdown("Sincronizado con tu Dashboard profesional en Google Drive.")
 
 
+# Función de conexión directa mediante el archivo credentials.json del repositorio
 @st.cache_resource
 def conectar_google_sheets():
   scope = [
@@ -25,21 +27,19 @@ def conectar_google_sheets():
       "https://www.googleapis.com/auth/drive",
   ]
 
-  if "gcp_service_account" in st.secrets:
+  # Leemos directamente el archivo local credentials.json incluido en el repositorio
+  if os.path.exists("credentials.json"):
+    creds = service_account.Credentials.from_service_account_file(
+        "credentials.json", scopes=scope
+    )
+  elif "gcp_service_account" in st.secrets:
+    # Respaldo por si se configuraron los secretos correctamente en formato plano
     sec = st.secrets["gcp_service_account"]
-    raw_pk = str(sec["private_key"])
-
-    clean_pk = raw_pk.replace("\\n", "\n").strip().strip('"').strip("'")
-    if not clean_pk.startswith("-----BEGIN PRIVATE KEY-----"):
-      clean_pk = "-----BEGIN PRIVATE KEY-----\n" + clean_pk
-    if not clean_pk.endswith("-----END PRIVATE KEY-----"):
-      clean_pk = clean_pk + "\n"
-
     secret_dict = {
         "type": str(sec.get("type", "service_account")),
         "project_id": str(sec.get("project_id", "")),
         "private_key_id": str(sec.get("private_key_id", "")),
-        "private_key": clean_pk,
+        "private_key": str(sec.get("private_key", "")).replace("\\n", "\n"),
         "client_email": str(sec.get("client_email", "")),
         "client_id": str(sec.get("client_id", "")),
         "auth_uri": str(
@@ -67,9 +67,7 @@ def conectar_google_sheets():
         temp_filename, scopes=scope
     )
   else:
-    creds = service_account.Credentials.from_service_account_file(
-        "credentials.json", scopes=scope
-    )
+    raise FileNotFoundError("No se encontró el archivo credentials.json")
 
   client = gspread.authorize(creds)
   return client.open("CALCULO DE MATERIALES MAC")
