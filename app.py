@@ -27,6 +27,10 @@ def conectar_google_sheets():
 
   if "gcp_service_account" in st.secrets:
     secret_dict = dict(st.secrets["gcp_service_account"])
+    if "private_key" in secret_dict:
+      secret_dict["private_key"] = secret_dict["private_key"].replace(
+          "\\n", "\n"
+      )
     creds = ServiceAccountCredentials.from_json_keyfile_dict(
         secret_dict, scope
     )
@@ -272,7 +276,6 @@ with col2:
   if capacidad_en_libras > 0 and peso_principal > 0:
     viajes_estimados = max(1, math.ceil(peso_principal / capacidad_en_libras))
 
-  # --- SECCIÓN DE RELLENO / COMPLEMENTO POR VIAJE ESPECÍFICO ---
   cantidades_p2 = [0.0] * len(df_materiales_base)
 
   if peso_principal > 0 and capacidad_en_libras > 0:
@@ -336,7 +339,6 @@ with col2:
         f" Requerirá **{viajes_estimados} viaje(s)**."
     )
 
-# --- ZONA DE DESGLOSE DE CARGA Y PESO LIBRE Y SUGERENCIAS ---
 st.markdown("---")
 st.subheader("📊 Desglose de Carga y Peso Libre por Viaje")
 
@@ -412,7 +414,6 @@ else:
 st.markdown("---")
 st.subheader("📅 Reserva de Espacio en el Calendario y Registro en Hoja 1")
 
-# --- SELECTORES BIDIRECCIONALES FUERA DEL FORMULARIO ---
 f_col1, f_col2 = st.columns(2)
 
 with f_col1:
@@ -430,7 +431,6 @@ with f_col2:
       on_change=actualizar_fecha_por_dia,
   )
 
-# --- DETECTAR HORARIOS DISPONIBLES EN TIEMPO REAL DESDE GOOGLE DRIVE ---
 try:
   sheet_temp = sh.worksheet("Hoja1")
   matriz_temp = sheet_temp.get("C1:AF26")
@@ -631,7 +631,6 @@ with st.form("form_envio"):
       except Exception as e:
         st.error(f"Error al verificar o guardar en Google Drive: {e}")
 
-# --- VISUALIZADOR DE DISPONIBILIDAD EN STREAMLIT ---
 st.markdown("---")
 st.subheader("👀 Cuadro de Disponibilidad (Horarios Clave con ⭐)")
 
