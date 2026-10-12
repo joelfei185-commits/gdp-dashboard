@@ -1,7 +1,8 @@
 from datetime import datetime, timedelta
+import json
 import math
-import gspread
 from oauth2client.service_account import ServiceAccountCredentials
+import gspread
 import pandas as pd
 import streamlit as st
 
@@ -16,16 +17,24 @@ st.title("🏗️ LOGISTICA DE ENVIO FERRETERIA & HOMECENTER EL INDIO")
 st.markdown("Sincronizado con tu Dashboard profesional en Google Drive.")
 
 
-# Función para conectar a Google Sheets
+# Función inteligente para conectar a Google Sheets (Local o Cloud)
 @st.cache_resource
 def conectar_google_sheets():
   scope = [
       "https://spreadsheets.google.com/feeds",
       "https://www.googleapis.com/auth/drive",
   ]
-  creds = ServiceAccountCredentials.from_json_keyfile_name(
-      "credentials.json", scope
-  )
+
+  if "gcp_service_account" in st.secrets:
+    secret_dict = dict(st.secrets["gcp_service_account"])
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(
+        secret_dict, scope
+    )
+  else:
+    creds = ServiceAccountCredentials.from_json_keyfile_name(
+        "credentials.json", scope
+    )
+
   client = gspread.authorize(creds)
   return client.open("CALCULO DE MATERIALES MAC")
 
@@ -265,7 +274,6 @@ with col2:
 
   # --- SECCIÓN DE RELLENO / COMPLEMENTO POR VIAJE ESPECÍFICO ---
   cantidades_p2 = [0.0] * len(df_materiales_base)
-  es_varios_pedidos = False
 
   if peso_principal > 0 and capacidad_en_libras > 0:
     with st.expander(
@@ -301,9 +309,6 @@ with col2:
             key=key_p2,
         )
         cantidades_p2.append(cant_comp)
-
-      if sum(cantidades_p2) > 0:
-        es_varios_pedidos = True
 
   df_p2 = df_materiales_base.copy()
   df_p2["CANTIDAD"] = cantidades_p2
@@ -383,7 +388,6 @@ if not df_con_carga.empty and capacidad_en_libras > 0:
     peso_libre_lbs = capacidad_en_libras - peso_este_viaje
     peso_libre_qq = peso_libre_lbs / 100
 
-    # Generamos la sugerencia si el viaje tiene espacio libre significativo (más de 50 lbs libres)
     sugerencia_texto = "✅ Viaje optimizado al límite"
     if peso_libre_lbs > 50.0:
       sugerencia_texto = f"⚠️ **Sugerencia:** A este viaje le faltan **{peso_libre_qq:,.2f} qq** ({peso_libre_lbs:,.1f} lbs) para llenarse."
