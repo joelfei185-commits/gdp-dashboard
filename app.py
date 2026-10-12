@@ -18,6 +18,7 @@ st.title("🏗️ LOGISTICA DE ENVIO FERRETERIA & HOMECENTER EL INDIO")
 st.markdown("Sincronizado con tu Dashboard profesional en Google Drive.")
 
 
+# Función inteligente con decodificación limpia de la llave privada
 @st.cache_resource
 def conectar_google_sheets():
   scope = [
@@ -26,35 +27,28 @@ def conectar_google_sheets():
   ]
 
   if "gcp_service_account" in st.secrets:
-    secret_dict = dict(st.secrets["gcp_service_account"])
-    if "private_key" in secret_dict:
-      pk = str(secret_dict["private_key"])
-      # Corrección exhaustiva para asegurar formato PEM válido de la llave privada
-      pk = pk.replace("\\n", "\n")
-      if "----BEGIN PRIVATE KEY----" in pk and not pk.startswith(
-          "-----BEGIN PRIVATE KEY-----"
-      ):
-        pk = (
-            "-----BEGIN PRIVATE KEY-----\n"
-            + pk.split("----BEGIN PRIVATE KEY----")[-1]
-        )
-      if "----END PRIVATE KEY----" in pk and not pk.endswith(
-          "-----END PRIVATE KEY-----\n"
-      ):
-        pk = (
-            pk.split("----END PRIVATE KEY----")[0]
-            + "-----END PRIVATE KEY-----\n"
-        )
-      secret_dict["private_key"] = pk
+    raw_key = st.secrets["gcp_service_account"]["private_key"]
+    fixed_key = raw_key.encode().decode("unicode-escape")
 
-    with tempfile.NamedTemporaryFile(
-        mode="w", delete=False, suffix=".json"
-    ) as f:
-      json.dump(secret_dict, f)
-      temp_filename = f.name
+    secret_dict = {
+        "type": st.secrets["gcp_service_account"]["type"],
+        "project_id": st.secrets["gcp_service_account"]["project_id"],
+        "private_key_id": st.secrets["gcp_service_account"]["private_key_id"],
+        "private_key": fixed_key,
+        "client_email": st.secrets["gcp_service_account"]["client_email"],
+        "client_id": st.secrets["gcp_service_account"]["client_id"],
+        "auth_uri": st.secrets["gcp_service_account"]["auth_uri"],
+        "token_uri": st.secrets["gcp_service_account"]["token_uri"],
+        "auth_provider_x509_cert_url": st.secrets["gcp_service_account"][
+            "auth_provider_x509_cert_url"
+        ],
+        "client_x509_cert_url": st.secrets["gcp_service_account"][
+            "client_x509_cert_url"
+        ],
+    }
 
-    creds = service_account.Credentials.from_service_account_file(
-        temp_filename, scopes=scope
+    creds = service_account.Credentials.from_service_account_info(
+        secret_dict, scopes=scope
     )
   else:
     creds = service_account.Credentials.from_service_account_file(
