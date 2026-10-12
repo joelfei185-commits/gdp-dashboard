@@ -18,7 +18,6 @@ st.title("🏗️ LOGISTICA DE ENVIO FERRETERIA & HOMECENTER EL INDIO")
 st.markdown("Sincronizado con tu Dashboard profesional en Google Drive.")
 
 
-# Función de conexión blindada usando archivo temporal seguro
 @st.cache_resource
 def conectar_google_sheets():
   scope = [
@@ -27,14 +26,27 @@ def conectar_google_sheets():
   ]
 
   if "gcp_service_account" in st.secrets:
-    # Convertimos los secretos a un diccionario y corregimos los saltos de línea de la llave
     secret_dict = dict(st.secrets["gcp_service_account"])
     if "private_key" in secret_dict:
-      secret_dict["private_key"] = secret_dict["private_key"].replace(
-          "\\n", "\n"
-      )
+      pk = str(secret_dict["private_key"])
+      # Corrección exhaustiva para asegurar formato PEM válido de la llave privada
+      pk = pk.replace("\\n", "\n")
+      if "----BEGIN PRIVATE KEY----" in pk and not pk.startswith(
+          "-----BEGIN PRIVATE KEY-----"
+      ):
+        pk = (
+            "-----BEGIN PRIVATE KEY-----\n"
+            + pk.split("----BEGIN PRIVATE KEY----")[-1]
+        )
+      if "----END PRIVATE KEY----" in pk and not pk.endswith(
+          "-----END PRIVATE KEY-----\n"
+      ):
+        pk = (
+            pk.split("----END PRIVATE KEY----")[0]
+            + "-----END PRIVATE KEY-----\n"
+        )
+      secret_dict["private_key"] = pk
 
-    # Creamos un archivo temporal JSON para que Google Auth lo lea de forma 100% nativa sin errores de padding
     with tempfile.NamedTemporaryFile(
         mode="w", delete=False, suffix=".json"
     ) as f:
