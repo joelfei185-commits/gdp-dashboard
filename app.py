@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+import base64
 import json
 import math
 import tempfile
@@ -18,7 +19,7 @@ st.title("🏗️ LOGISTICA DE ENVIO FERRETERIA & HOMECENTER EL INDIO")
 st.markdown("Sincronizado con tu Dashboard profesional en Google Drive.")
 
 
-# Función inteligente con decodificación limpia de la llave privada
+# Función de conexión con reparación automática de formato PEM
 @st.cache_resource
 def conectar_google_sheets():
   scope = [
@@ -27,24 +28,27 @@ def conectar_google_sheets():
   ]
 
   if "gcp_service_account" in st.secrets:
-    raw_key = st.secrets["gcp_service_account"]["private_key"]
-    fixed_key = raw_key.encode().decode("unicode-escape")
+    sec = st.secrets["gcp_service_account"]
+    pk = str(sec["private_key"])
+
+    # Limpieza profunda y blindada para evitar cualquier error de offset o PEM
+    pk = pk.replace("\\n", "\n").strip('"').strip("'")
+    if "BEGIN PRIVATE KEY" in pk and not pk.startswith("-----BEGIN PRIVATE KEY-----"):
+      pk = "-----BEGIN PRIVATE KEY-----\n" + pk.split("BEGIN PRIVATE KEY")[-1]
+    if "END PRIVATE KEY" in pk and not pk.endswith("-----END PRIVATE KEY-----\n"):
+      pk = pk.split("END PRIVATE KEY")[0] + "END PRIVATE KEY-----\n"
 
     secret_dict = {
-        "type": st.secrets["gcp_service_account"]["type"],
-        "project_id": st.secrets["gcp_service_account"]["project_id"],
-        "private_key_id": st.secrets["gcp_service_account"]["private_key_id"],
-        "private_key": fixed_key,
-        "client_email": st.secrets["gcp_service_account"]["client_email"],
-        "client_id": st.secrets["gcp_service_account"]["client_id"],
-        "auth_uri": st.secrets["gcp_service_account"]["auth_uri"],
-        "token_uri": st.secrets["gcp_service_account"]["token_uri"],
-        "auth_provider_x509_cert_url": st.secrets["gcp_service_account"][
-            "auth_provider_x509_cert_url"
-        ],
-        "client_x509_cert_url": st.secrets["gcp_service_account"][
-            "client_x509_cert_url"
-        ],
+        "type": str(sec.get("type", "service_account")),
+        "project_id": str(sec.get("project_id", "")),
+        "private_key_id": str(sec.get("private_key_id", "")),
+        "private_key": pk,
+        "client_email": str(sec.get("client_email", "")),
+        "client_id": str(sec.get("client_id", "")),
+        "auth_uri": str(sec.get("auth_uri", "https://accounts.google.com/o/oauth2/auth")),
+        "token_uri": str(sec.get("token_uri", "https://oauth2.googleapis.com/token")),
+        "auth_provider_x509_cert_url": str(sec.get("auth_provider_x509_cert_url", "https://www.googleapis.com/oauth2/v1/certs")),
+        "client_x509_cert_url": str(sec.get("client_x509_cert_url", "")),
     }
 
     creds = service_account.Credentials.from_service_account_info(
