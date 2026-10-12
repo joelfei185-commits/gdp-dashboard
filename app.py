@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 import json
 import math
+import tempfile
 from google.oauth2 import service_account
 import gspread
 import pandas as pd
@@ -17,7 +18,6 @@ st.title("🏗️ LOGISTICA DE ENVIO FERRETERIA & HOMECENTER EL INDIO")
 st.markdown("Sincronizado con tu Dashboard profesional en Google Drive.")
 
 
-# Función de conexión con blindaje total contra errores PEM
 @st.cache_resource
 def conectar_google_sheets():
   scope = [
@@ -29,8 +29,7 @@ def conectar_google_sheets():
     sec = st.secrets["gcp_service_account"]
     raw_pk = str(sec["private_key"])
 
-    # Normalización estricta de la llave privada para eliminar cualquier símbolo extraño
-    clean_pk = raw_pk.replace("\\n", "\n").strip()
+    clean_pk = raw_pk.replace("\\n", "\n").strip().strip('"').strip("'")
     if not clean_pk.startswith("-----BEGIN PRIVATE KEY-----"):
       clean_pk = "-----BEGIN PRIVATE KEY-----\n" + clean_pk
     if not clean_pk.endswith("-----END PRIVATE KEY-----"):
@@ -58,8 +57,14 @@ def conectar_google_sheets():
         "client_x509_cert_url": str(sec.get("client_x509_cert_url", "")),
     }
 
-    creds = service_account.Credentials.from_service_account_info(
-        secret_dict, scopes=scope
+    with tempfile.NamedTemporaryFile(
+        mode="w", delete=False, suffix=".json", encoding="utf-8"
+    ) as f:
+      json.dump(secret_dict, f)
+      temp_filename = f.name
+
+    creds = service_account.Credentials.from_service_account_file(
+        temp_filename, scopes=scope
     )
   else:
     creds = service_account.Credentials.from_service_account_file(
