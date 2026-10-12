@@ -19,7 +19,7 @@ st.title("🏗️ LOGISTICA DE ENVIO FERRETERIA & HOMECENTER EL INDIO")
 st.markdown("Sincronizado con tu Dashboard profesional en Google Drive.")
 
 
-# Función de conexión con tolerancia de reloj para evitar errores JWT
+# Función de conexión con formateo estricto de la llave privada para evitar error JWT
 @st.cache_resource
 def conectar_google_sheets():
   scope = [
@@ -27,20 +27,34 @@ def conectar_google_sheets():
       "https://www.googleapis.com/auth/drive",
   ]
 
-  skew = timedelta(seconds=10)
-
   if os.path.exists("credentials.json"):
     creds = service_account.Credentials.from_service_account_file(
         "credentials.json", scopes=scope
     )
-    creds._clock_skew = skew
   elif "gcp_service_account" in st.secrets:
     sec = st.secrets["gcp_service_account"]
+
+    # Limpieza y estructuración obligatoria de la llave privada
+    pk = str(sec.get("private_key", ""))
+    pk = pk.replace("\\n", "\n")
+    if "-----BEGIN PRIVATE KEY-----" in pk and not pk.startswith(
+        "-----BEGIN PRIVATE KEY-----\n"
+    ):
+      pk = pk.replace(
+          "-----BEGIN PRIVATE KEY-----", "-----BEGIN PRIVATE KEY-----\n"
+      )
+    if "-----END PRIVATE KEY-----" in pk and not pk.endswith(
+        "\n-----END PRIVATE KEY-----\n"
+    ):
+      pk = pk.replace(
+          "-----END PRIVATE KEY-----", "\n-----END PRIVATE KEY-----\n"
+      )
+
     secret_dict = {
         "type": str(sec.get("type", "service_account")),
         "project_id": str(sec.get("project_id", "")),
         "private_key_id": str(sec.get("private_key_id", "")),
-        "private_key": str(sec.get("private_key", "")).replace("\\n", "\n"),
+        "private_key": pk,
         "client_email": str(sec.get("client_email", "")),
         "client_id": str(sec.get("client_id", "")),
         "auth_uri": str(
@@ -61,7 +75,6 @@ def conectar_google_sheets():
     creds = service_account.Credentials.from_service_account_info(
         secret_dict, scopes=scope
     )
-    creds._clock_skew = skew
   else:
     raise FileNotFoundError(
         "No se encontró el archivo credentials.json ni los secretos configurados."
