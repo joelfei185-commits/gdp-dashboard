@@ -17,7 +17,7 @@ st.title("🏗️ LOGISTICA DE ENVIO FERRETERIA & HOMECENTER EL INDIO")
 st.markdown("Sincronizado con tu Dashboard profesional en Google Drive.")
 
 
-# Función de conexión directa utilizando el archivo físico credentials.json del repositorio
+# Función de conexión con tolerancia de reloj (clock_skew) para evitar errores de firma JWT
 @st.cache_resource
 def conectar_google_sheets():
   scope = [
@@ -25,15 +25,16 @@ def conectar_google_sheets():
       "https://www.googleapis.com/auth/drive",
   ]
 
-  # Verificamos que el archivo credentials.json exista en la raíz del proyecto en GitHub
   if os.path.exists("credentials.json"):
     creds = service_account.Credentials.from_service_account_file(
         "credentials.json", scopes=scope
     )
+    # Agregamos una tolerancia de 30 segundos para sincronizar el desfase horario con Google
+    creds._clock_skew = timedelta(seconds=30)
   else:
     raise FileNotFoundError(
-        "No se encontró el archivo credentials.json en el repositorio de GitHub."
-        " Por favor súbelo a la raíz."
+        "No se encontró el archivo credentials.json en la raíz del repositorio de"
+        " GitHub."
     )
 
   client = gspread.authorize(creds)
