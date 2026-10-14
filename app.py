@@ -1,9 +1,14 @@
 from datetime import datetime, timedelta
+import json
 import math
 import os
+import time
+from google.auth.transport.requests import Request
 from google.oauth2 import service_account
 import gspread
+import jwt  # PyJWT o google-auth internal
 import pandas as pd
+import requests
 import streamlit as st
 
 # Configuración de la página
@@ -17,7 +22,7 @@ st.title("🏗️ LOGISTICA DE ENVIO FERRETERIA & HOMECENTER EL INDIO")
 st.markdown("Sincronizado con tu Dashboard profesional en Google Drive.")
 
 
-# Función de conexión blindada con sincronización y tolerancia amplia de reloj
+# Función de conexión directa omitiendo el desfase de reloj del servidor
 @st.cache_resource
 def conectar_google_sheets():
   scope = [
@@ -26,19 +31,26 @@ def conectar_google_sheets():
   ]
 
   if os.path.exists("credentials.json"):
-    creds = service_account.Credentials.from_service_account_file(
-        "credentials.json", scopes=scope
+    with open("credentials.json", "r", encoding="utf-8") as f:
+      creds_data = json.load(f)
+
+    # Creamos las credenciales directamente pasando el diccionario
+    creds = service_account.Credentials.from_service_account_info(
+        creds_data, scopes=scope
     )
-    # Ampliamos la tolerancia a 300 segundos (5 minutos) para corregir cualquier desfase del servidor de Streamlit
-    creds._clock_skew = timedelta(seconds=300)
+
+    # Forzamos una ventana de tiempo retroactiva de 60 segundos para absorver cualquier desfase de reloj
+    req = Request()
+    creds._clock_skew = timedelta(seconds=60)
+    creds.refresh(req)
+
+    client = gspread.authorize(creds)
+    return client.open("CALCULO DE MATERIALES MAC")
   else:
     raise FileNotFoundError(
         "No se encontró el archivo credentials.json en la raíz del repositorio de"
         " GitHub."
     )
-
-  client = gspread.authorize(creds)
-  return client.open("CALCULO DE MATERIALES MAC")
 
 
 # Lista fija de materiales exacta
