@@ -17,7 +17,7 @@ st.title("🏗️ LOGISTICA DE ENVIO FERRETERIA & HOMECENTER EL INDIO")
 st.markdown("Sincronizado con tu Dashboard profesional en Google Drive.")
 
 
-# Función de conexión con tolerancia de reloj (clock_skew) para evitar errores de firma JWT
+# Función de conexión blindada con sincronización y tolerancia amplia de reloj
 @st.cache_resource
 def conectar_google_sheets():
   scope = [
@@ -29,8 +29,8 @@ def conectar_google_sheets():
     creds = service_account.Credentials.from_service_account_file(
         "credentials.json", scopes=scope
     )
-    # Agregamos una tolerancia de 30 segundos para sincronizar el desfase horario con Google
-    creds._clock_skew = timedelta(seconds=30)
+    # Ampliamos la tolerancia a 300 segundos (5 minutos) para corregir cualquier desfase del servidor de Streamlit
+    creds._clock_skew = timedelta(seconds=300)
   else:
     raise FileNotFoundError(
         "No se encontró el archivo credentials.json en la raíz del repositorio de"
