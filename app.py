@@ -4,15 +4,24 @@ import pandas as pd
 import requests
 import streamlit as st
 
-# Configuración de la página
+# Configuración de la página con icono de ferretería
 st.set_page_config(
     page_title="Logística de Envío - Ferretería & Homecenter El Indio",
-    page_icon="🏗️",
+    page_icon="🧰",
     layout="wide",
 )
 
-st.title("🏗️ LOGISTICA DE ENVIO FERRETERIA & HOMECENTER EL INDIO")
-st.markdown("Sincronización en vivo con Google Drive.")
+# Título centrado con icono de herramientas
+st.markdown(
+    "<h1 style='text-align: center;'>🧰 LOGÍSTICA DE ENVÍO FERRETERÍA &"
+    " HOMECENTER EL INDIO</h1>",
+    unsafe_allow_html=True,
+)
+st.markdown(
+    "<p style='text-align: center; color: gray;'>Sincronización en vivo con"
+    " Google Drive.</p>",
+    unsafe_allow_html=True,
+)
 
 # URL de tu Apps Script configurada
 WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyTrK1m9Rs1zSpUp1BRKn5WmSV-ixTrZ-R_yAng-xEGR_6NWYaz1T1W7uSjms5314U3/exec"
@@ -450,8 +459,6 @@ with st.form("form_envio"):
 
 st.markdown("---")
 st.subheader("👀 Cuadro de Disponibilidad en Google Drive")
-if st.button("🔄 Actualizar Cuadro"):
-  st.rerun()
 
 try:
   matriz_datos = obtener_matriz_hoja()
@@ -483,8 +490,7 @@ try:
 
       if dia != "SÁBADO" or hora_etiqueta not in [
           "2:30 p.m. (⭐ Viaje 3)",
-          "4:30 p.m. (⭐ Viaje 4)",
-      ]:
+          "4:30 p.m. (⭐ Viaje 4)"]:
         if libres_count == len(cols):
           fila_actual[dia] = "🟢 Todo Libre (5)"
         elif libres_count == 0:
