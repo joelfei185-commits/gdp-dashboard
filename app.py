@@ -1,11 +1,7 @@
 from datetime import datetime, timedelta
-import json
 import math
-import os
-from google.auth.transport.requests import Request
-from google.oauth2 import service_account
-import gspread
 import pandas as pd
+import requests
 import streamlit as st
 
 # Configuración de la página
@@ -16,37 +12,38 @@ st.set_page_config(
 )
 
 st.title("🏗️ LOGISTICA DE ENVIO FERRETERIA & HOMECENTER EL INDIO")
-st.markdown("Sincronizado con tu Dashboard profesional en Google Drive.")
+st.markdown("Sincronizado con tu Web API de Google Sheets.")
+
+# PEGA AQUÍ TU URL DE APPS SCRIPT
+WEB_APP_URL = "TU_URL_DE_APPS_SCRIPT_AQUI"
 
 
-# Función de conexión optimizada y limpia
-@st.cache_resource
-def conectar_google_sheets():
-  scope = [
-      "https://spreadsheets.google.com/feeds",
-      "https://www.googleapis.com/auth/drive",
-  ]
+def obtener_matriz_hoja():
+  try:
+    response = requests.get(f"{WEB_APP_URL}?action=getData", timeout=10)
+    if response.status_code == 200:
+      return response.json()
+  except Exception:
+    pass
+  return []
 
-  if os.path.exists("credentials.json"):
-    with open("credentials.json", "r", encoding="utf-8") as f:
-      creds_data = json.load(f)
 
-    creds = service_account.Credentials.from_service_account_info(
-        creds_data, scopes=scope
-    )
+def actualizar_celda_hoja(celda, texto, color):
+  try:
+    payload = {"action": "updateCell", "cell": celda, "text": texto, "color": color}
+    requests.post(WEB_APP_URL, json=payload, timeout=10)
+  except Exception as e:
+    st.error(f"Error al actualizar celda: {e}")
 
-    # Ventana de tolerancia y actualización de token para evitar desfase en la nube
-    req = Request()
-    creds._clock_skew = timedelta(seconds=60)
-    creds.refresh(req)
 
-    client = gspread.authorize(creds)
-    return client.open("CALCULO DE MATERIALES MAC")
-  else:
-    raise FileNotFoundError(
-        "No se encontró el archivo credentials.json en la raíz del repositorio de"
-        " GitHub."
-    )
+def agregar_fila_hoja(row_data):
+  try:
+    payload = {"action": "appendRow", "row": row_data}
+    res = requests.post(WEB_APP_URL, json=payload, timeout=10)
+    return res.json().get("row", 30)
+  except Exception as e:
+    st.error(f"Error al guardar registro: {e}")
+    return 30
 
 
 # Lista fija de materiales exacta
@@ -91,43 +88,31 @@ df_materiales_base = pd.DataFrame({
     ],
 })
 
-# Intentar conectar a Google Drive para motoristas y calendario
-try:
-  sh = conectar_google_sheets()
+df_motoristas = pd.DataFrame({
+    "MOTORISTA": ["ELVIS", "LUIS PEREZ", "DIEGO", "ALVARO", "TOMAS"],
+    "CAPACIDAD (QUINTALES)": [100, 100, 50, 100, 100],
+})
 
-  df_motoristas = pd.DataFrame({
-      "MOTORISTA": ["ELVIS", "LUIS PEREZ", "DIEGO", "ALVARO", "TOMAS"],
-      "CAPACIDAD (QUINTALES)": [100, 100, 50, 100, 100],
-  })
-
-  st.success("¡Conectado y sincronizado con Google Drive exitosamente!")
-
-except Exception as e:
-  st.warning(f"Aviso de conexión: {e}. Usando valores locales.")
-  df_motoristas = pd.DataFrame(
-      {"MOTORISTA": ["ELVIS"], "CAPACIDAD (QUINTALES)": [100]}
-  )
+st.success("¡Conectado mediante Web API de Google exitosamente!")
 
 # Colores corporativos en formato RGB para cada motorista
 COLORES_MOTORISTAS = {
-    "ELVIS": {"red": 1.0, "green": 0.92, "blue": 0.23},  # Amarillo suave
-    "LUIS PEREZ": {"red": 0.56, "green": 0.93, "blue": 0.56},  # Verde suave
-    "DIEGO": {"red": 0.68, "green": 0.85, "blue": 0.90},  # Celeste suave
-    "ALVARO": {"red": 0.85, "green": 0.65, "blue": 1.0},  # Morado/Lila suave
-    "TOMAS": {"red": 1.0, "green": 0.75, "blue": 0.80},  # Rosa suave
+    "ELVIS": {"red": 1.0, "green": 0.92, "blue": 0.23},
+    "LUIS PEREZ": {"red": 0.56, "green": 0.93, "blue": 0.56},
+    "DIEGO": {"red": 0.68, "green": 0.85, "blue": 0.90},
+    "ALVARO": {"red": 0.85, "green": 0.65, "blue": 1.0},
+    "TOMAS": {"red": 1.0, "green": 0.75, "blue": 0.80},
 }
 
-# Mapeo de bloques de columnas exactos por día (C=3 hasta AF=32)
 mapa_dias_bloques = {
-    "LUNES": [3, 4, 5, 6, 7],  # C a G
-    "MARTES": [8, 9, 10, 11, 12],  # H a L
-    "MIÉRCOLES": [13, 14, 15, 16, 17],  # M a Q
-    "JUEVES": [18, 19, 20, 21, 22],  # R a V
-    "VIERNES": [23, 24, 25, 26, 27],  # W a AA
-    "SÁBADO": [28, 29, 30, 31, 32],  # AB a AF
+    "LUNES": [3, 4, 5, 6, 7],
+    "MARTES": [8, 9, 10, 11, 12],
+    "MIÉRCOLES": [13, 14, 15, 16, 17],
+    "JUEVES": [18, 19, 20, 21, 22],
+    "VIERNES": [23, 24, 25, 26, 27],
+    "SÁBADO": [28, 29, 30, 31, 32],
 }
 
-# Mapeo exacto de filas en Google Sheets
 mapa_filas = {
     "8:00 a.m. (⭐ Viaje 1)_LUN_MIE": 6,
     "10:00 a.m. (⭐ Viaje 2)_LUN_MIE": 8,
@@ -168,16 +153,14 @@ def es_reserva_real(val):
   val_str = str(val).strip()
   if val_str.lower() in ["none", "nan", ""]:
     return False
-
   val_upper = val_str.upper()
-  motoristas_validos = ["ELVIS", "LUIS PEREZ", "DIEGO", "ALVARO", "TOMAS"]
-  for mot in motoristas_validos:
+  for mot in ["ELVIS", "LUIS PEREZ", "DIEGO", "ALVARO", "TOMAS"]:
     if mot in val_upper:
       return True
   return False
 
 
-# --- GESTIÓN DE ESTADOS DE SESIÓN Y SINCRONIZACIÓN BIDIRECCIONAL ---
+# --- INTERFAZ ---
 if "form_reset" not in st.session_state:
   st.session_state.form_reset = False
 
@@ -238,7 +221,6 @@ def actualizar_dia_por_fecha():
     st.session_state.widget_dia_envio = "LUNES"
 
 
-# --- INTERFAZ DE LA APLICACIÓN ---
 col1, col2 = st.columns(2)
 
 with col1:
@@ -250,7 +232,6 @@ with col1:
     key_p1 = f"p1_{index}"
     if key_p1 not in st.session_state:
       st.session_state[key_p1] = 0.0
-
     cant = st.number_input(
         f"{mat_nombre} (P. unidad: {mat_lbs:.2f} lbs)",
         min_value=0.0,
@@ -265,11 +246,9 @@ with col1:
 
 with col2:
   st.subheader("🚛 Resumen y Estado de Carga")
-
   motorista_seleccionado = st.selectbox(
       "Seleccione Motorista", df_motoristas["MOTORISTA"]
   )
-
   capacidad_quintales = float(
       df_motoristas[df_motoristas["MOTORISTA"] == motorista_seleccionado][
           "CAPACIDAD (QUINTALES)"
@@ -283,34 +262,22 @@ with col2:
     viajes_estimados = max(1, math.ceil(peso_principal / capacidad_en_libras))
 
   cantidades_p2 = [0.0] * len(df_materiales_base)
-
   if peso_principal > 0 and capacidad_en_libras > 0:
     with st.expander(
         "➕ Añadir Materiales Extra / Rellenar Viaje Incompleto"
     ):
-      st.markdown(
-          "Selecciona un viaje para agregarle complementos y rellenar su peso"
-          " libre:"
-      )
       viajes_disponibles_opciones = [
           f"Viaje {i+1}" for i in range(viajes_estimados)
       ]
       viaje_a_rellenar = st.selectbox(
           "Elegir Viaje a Completar", viajes_disponibles_opciones
       )
-
-      st.markdown("---")
-      st.markdown(
-          f"Agregando materiales extra para **{viaje_a_rellenar}**:"
-      )
       cantidades_p2 = []
       for index, row in df_materiales_base.iterrows():
         mat_nombre = str(row["MATERIAL"])
-        mat_lbs = float(row["LBS"])
         key_p2 = f"p2_{index}"
         if key_p2 not in st.session_state:
           st.session_state[key_p2] = 0.0
-
         cant_comp = st.number_input(
             f"Extra: {mat_nombre}",
             min_value=0.0,
@@ -337,98 +304,16 @@ with col2:
       value=f"{peso_total_quintales:,.2f} qq ({peso_total_general:,.2f} lbs)",
   )
 
-  if capacidad_en_libras > 0 and peso_total_general > 0:
-    viajes_estimados = max(1, math.ceil(peso_total_general / capacidad_en_libras))
-    st.info(
-        f"💡 Capacidad máxima del vehículo (**{motorista_seleccionado}**):"
-        f" **{capacidad_quintales:,.0f} qq** ({capacidad_en_libras:,.0f} lbs)."
-        f" Requerirá **{viajes_estimados} viaje(s)**."
-    )
-
-st.markdown("---")
-st.subheader("📊 Desglose de Carga y Peso Libre por Viaje")
-
-df_con_carga = df_total_general[df_total_general["CANTIDAD"] > 0].copy()
-if not df_con_carga.empty and capacidad_en_libras > 0:
-  nombres_materiales = df_con_carga["MATERIAL"].tolist()
-  cantidades_materiales = df_con_carga["CANTIDAD"].tolist()
-  pesos_unitarios = df_con_carga["LBS"].tolist()
-
-  viajes_detalle = []
-  item_idx = 0
-  cantidad_actual_item = (
-      cantidades_materiales[0] if len(cantidades_materiales) > 0 else 0
-  )
-
-  for v in range(viajes_estimados):
-    peso_este_viaje = 0.0
-    materiales_en_viaje = []
-
-    while item_idx < len(nombres_materiales) and peso_este_viaje < (
-        capacidad_en_libras - 1e-5
-    ):
-      mat_nombre = nombres_materiales[item_idx]
-      peso_u = pesos_unitarios[item_idx]
-
-      espacio_libre = capacidad_en_libras - peso_este_viaje
-      cantidad_que_cabe = espacio_libre / peso_u if peso_u > 0 else 0
-      cantidad_a_llevar = min(cantidad_actual_item, cantidad_que_cabe)
-
-      if cantidad_a_llevar > 0:
-        peso_parcial = cantidad_a_llevar * peso_u
-        materiales_en_viaje.append(
-            f"{mat_nombre}: {cantidad_a_llevar:,.1f} un. ({peso_parcial:,.2f}"
-            " lbs)"
-        )
-        peso_este_viaje += peso_parcial
-        cantidad_actual_item -= cantidad_a_llevar
-
-      if cantidad_actual_item <= 1e-5:
-        item_idx += 1
-        if item_idx < len(cantidades_materiales):
-          cantidad_actual_item = cantidades_materiales[item_idx]
-
-    porcentaje_llenado = (
-        (peso_este_viaje / capacidad_en_libras) * 100
-        if capacidad_en_libras > 0
-        else 0
-    )
-    peso_libre_lbs = capacidad_en_libras - peso_este_viaje
-    peso_libre_qq = peso_libre_lbs / 100
-
-    sugerencia_texto = "✅ Viaje optimizado al límite"
-    if peso_libre_lbs > 50.0:
-      sugerencia_texto = f"⚠️ **Sugerencia:** A este viaje le faltan **{peso_libre_qq:,.2f} qq** ({peso_libre_lbs:,.1f} lbs) para llenarse."
-
-    viajes_detalle.append({
-        "Viaje": f"Viaje {v+1}",
-        "Peso Transportado": f"{peso_este_viaje / 100:,.2f} qq ({peso_este_viaje:,.1f} lbs)",
-        "⚖️ PESO LIBRE / DISPONIBLE": f"{peso_libre_qq:,.2f} qq ({peso_libre_lbs:,.1f} lbs)",
-        "Espacio Usado": f"{porcentaje_llenado:.1f}%",
-        "💡 Sugerencia de Carga": sugerencia_texto,
-        "Materiales Asignados": ", ".join(materiales_en_viaje),
-    })
-
-  df_viajes_opt = pd.DataFrame(viajes_detalle)
-  st.dataframe(df_viajes_opt, hide_index=True, use_container_width=True)
-else:
-  st.info(
-      "👉 Ingrese cantidades de materiales arriba para ver el desglose y el"
-      " peso disponible por viaje."
-  )
-
 st.markdown("---")
 st.subheader("📅 Reserva de Espacio en el Calendario y Registro en Hoja 1")
 
 f_col1, f_col2 = st.columns(2)
-
 with f_col1:
   fecha_registro = st.date_input(
       "Fecha a Hacer el Viaje",
       key="widget_fecha_envio",
       on_change=actualizar_dia_por_fecha,
   )
-
 with f_col2:
   dia_envio = st.selectbox(
       "Día de la semana",
@@ -437,22 +322,15 @@ with f_col2:
       on_change=actualizar_fecha_por_dia,
   )
 
-try:
-  sheet_temp = sh.worksheet("Hoja1")
-  matriz_temp = sheet_temp.get("C1:AF26")
-except Exception:
-  matriz_temp = []
+matriz_temp = obtener_matriz_hoja()
 
 with st.form("form_envio"):
   horarios_libres_opciones = []
-  if dia_envio == "SÁBADO":
-    horarios_para_revisar = [
-        "8:00 a.m. (⭐ Viaje 1)",
-        "10:00 a.m. (⭐ Viaje 2)",
-    ]
-  else:
-    horarios_para_revisar = HORARIOS_ESTRELLA
-
+  horarios_para_revisar = (
+      ["8:00 a.m. (⭐ Viaje 1)", "10:00 a.m. (⭐ Viaje 2)"]
+      if dia_envio == "SÁBADO"
+      else HORARIOS_ESTRELLA
+  )
   columnas_del_dia = mapa_dias_bloques.get(dia_envio, [])
 
   for hora_b in horarios_para_revisar:
@@ -464,11 +342,10 @@ with st.form("form_envio"):
     if matriz_temp and len(matriz_temp) > row_idx_rev:
       for c_num in columnas_del_dia:
         c_idx_rev = c_num - 3
-        val_celda = ""
         try:
           val_celda = matriz_temp[row_idx_rev][c_idx_rev]
         except IndexError:
-          pass
+          val_celda = ""
         if not es_reserva_real(val_celda):
           espacios_libres_en_hora += 1
     else:
@@ -479,15 +356,13 @@ with st.form("form_envio"):
           f"{hora_b} (Disponibles: {espacios_libres_en_hora}/5)"
       )
 
-  if horarios_libres_opciones:
-    horario_seleccionado = st.selectbox(
-        "Seleccione Horario Disponible", horarios_libres_opciones
-    )
-  else:
-    st.warning(
-        f"⚠️ No hay horarios disponibles con espacio para el día {dia_envio}."
-    )
-    horario_seleccionado = None
+  horario_seleccionado = (
+      st.selectbox("Seleccione Horario Disponible", horarios_libres_opciones)
+      if horarios_libres_opciones
+      else None
+  )
+  if not horarios_libres_opciones:
+    st.warning(f"⚠️ No hay horarios disponibles para el día {dia_envio}.")
 
   reservado_por = st.text_input(
       "Nombre de Quien Reserva", key="reservado_por_input"
@@ -507,173 +382,97 @@ with st.form("form_envio"):
       st.warning("Debe indicar la dirección de destino.")
     elif not horario_seleccionado:
       st.error("⚠️ Debe seleccionar un horario válido.")
-    elif viajes_estimados > 4:
-      st.error(
-          "⚠️ La carga requiere más de 4 viajes, excediendo el límite diario"
-          " por motorista."
-      )
-    elif dia_envio == "SÁBADO" and viajes_estimados > 2:
-      st.error(
-          "⚠️ Los sábados solo se trabaja hasta mediodía (máximo 2 viajes"
-          " posibles)."
-      )
     else:
       try:
-        sheet_principal = sh.worksheet("Hoja1")
-        matriz_datos = sheet_principal.get("C1:AF26")
+        matriz_datos = obtener_matriz_hoja()
         columnas_dia = mapa_dias_bloques[dia_envio]
-
         hora_base_elegida = horario_seleccionado.split(" (Disponibles:")[0]
-
         idx_inicio = horarios_para_revisar.index(hora_base_elegida)
-        horarios_a_reservar = []
 
-        for i in range(viajes_estimados):
-          if idx_inicio + i < len(horarios_para_revisar):
-            horarios_a_reservar.append(horarios_para_revisar[idx_inicio + i])
+        horarios_a_reservar = [
+            horarios_para_revisar[idx_inicio + i] for i in range(viajes_estimados)
+        ]
+        espacios_totales_encontrados = []
 
-        if len(horarios_a_reservar) < viajes_estimados:
-          st.error(
-              "⚠️ No hay suficientes horarios sucesivos disponibles para los"
-              f" {viajes_estimados} viajes requeridos."
-          )
-        else:
-          espacios_totales_encontrados = []
-          error_espacio = False
-
-          for hora_b in horarios_a_reservar:
-            clave_f = obtener_clave_fila(hora_b, dia_envio)
-            fila_meta = mapa_filas[clave_f]
-            row_idx = fila_meta - 1
-
-            col_encontrada = None
-            for col_num in columnas_dia:
-              col_idx = col_num - 3
-              val = ""
-              try:
-                val = matriz_datos[row_idx][col_idx]
-              except IndexError:
-                pass
-
-              if not es_reserva_real(val):
-                col_encontrada = col_num
-                break
-
-            if col_encontrada:
-              espacios_totales_encontrados.append(
-                  (col_encontrada, fila_meta, hora_b)
-              )
-            else:
-              error_espacio = True
+        for hora_b in horarios_a_reservar:
+          clave_f = obtener_clave_fila(hora_b, dia_envio)
+          fila_meta = mapa_filas[clave_f]
+          row_idx = fila_meta - 1
+          col_encontrada = None
+          for col_num in columnas_dia:
+            col_idx = col_num - 3
+            val = (
+                matriz_datos[row_idx][col_idx]
+                if matriz_datos and len(matriz_datos) > row_idx
+                else ""
+            )
+            if not es_reserva_real(val):
+              col_encontrada = col_num
               break
-
-          if error_espacio or len(espacios_totales_encontrados) < viajes_estimados:
-            st.error(
-                "⚠️ Algunos de los horarios consecutivos seleccionados ya"
-                " fueron ocupados. Por favor actualice el cuadro."
-            )
-          else:
-            color_rgb = COLORES_MOTORISTAS.get(
-                motorista_seleccionado, {"red": 1.0, "green": 1.0, "blue": 1.0}
+          if col_encontrada:
+            espacios_totales_encontrados.append(
+                (col_encontrada, fila_meta, hora_b)
             )
 
-            for col_num, fila_meta, hora_b in espacios_totales_encontrados:
-              letra_col = num_a_letra(col_num)
-              celda_destino = f"{letra_col}{fila_meta}"
-              texto_reserva = (
-                  f"{motorista_seleccionado} ({reservado_por}) - Ocupado"
-              )
+        if len(espacios_totales_encontrados) < viajes_estimados:
+          st.error("⚠️ Algunos horarios consecutivos ya fueron ocupados.")
+        else:
+          color_rgb = COLORES_MOTORISTAS.get(
+              motorista_seleccionado, {"red": 1.0, "green": 1.0, "blue": 1.0}
+          )
+          for col_num, fila_meta, hora_b in espacios_totales_encontrados:
+            letra_col = num_a_letra(col_num)
+            celda_destino = f"{letra_col}{fila_meta}"
+            texto_reserva = f"{motorista_seleccionado} ({reservado_por}) - Ocupado"
+            actualizar_celda_hoja(celda_destino, texto_reserva, color_rgb)
 
-              sheet_principal.update_acell(celda_destino, texto_reserva)
-              sheet_principal.format(
-                  celda_destino,
-                  {
-                      "backgroundColor": color_rgb,
-                      "textFormat": {"bold": True},
-                      "horizontalAlignment": "CENTER",
-                  },
-              )
+          fecha_str = fecha_registro.strftime("%Y-%m-%d")
+          fila_guardada = agregar_fila_hoja([
+              motorista_seleccionado,
+              f"{viajes_estimados} Viajes",
+              reservado_por,
+              f"{peso_total_quintales:,.2f} qq ({peso_total_general:,.2f} lbs)",
+              fecha_str,
+              direccion_envio,
+          ])
 
-            fecha_str = fecha_registro.strftime("%Y-%m-%d")
-            try:
-              columna_c_valores = sheet_principal.col_values(3)
-              siguiente_fila = 30
-
-              for idx_f in range(29, len(columna_c_valores)):
-                val_fila = str(columna_c_valores[idx_f]).strip()
-                if (
-                    not val_fila
-                    or val_fila.lower() == "none"
-                    or val_fila.lower() == "nan"
-                ):
-                  siguiente_fila = idx_f + 1
-                  break
-              else:
-                siguiente_fila = max(30, len(columna_c_valores) + 1)
-
-              sheet_principal.update(
-                  f"C{siguiente_fila}:H{siguiente_fila}",
-                  [[
-                      motorista_seleccionado,
-                      f"{viajes_estimados} Viajes",
-                      reservado_por,
-                      f"{peso_total_quintales:,.2f} qq ({peso_total_general:,.2f} lbs)",
-                      fecha_str,
-                      direccion_envio,
-                  ]],
-              )
-            except Exception as ex:
-              st.warning(f"Detalle al guardar registro: {ex}")
-
-            st.session_state.form_reset = True
-
-            st.success(
-                f"¡Se han agendado con éxito los {viajes_estimados} viajes"
-                f" consecutivos para el {dia_envio} ({fecha_str}) en la fila"
-                f" {siguiente_fila}!"
-            )
-            st.rerun()
-
+          st.session_state.form_reset = True
+          st.success(
+              f"¡Se han agendado con éxito los {viajes_estimados} viajes para"
+              f" el {dia_envio} en la fila {fila_guardada}!"
+          )
+          st.rerun()
       except Exception as e:
-        st.error(f"Error al verificar o guardar en Google Drive: {e}")
+        st.error(f"Error al procesar: {e}")
 
 st.markdown("---")
-st.subheader("👀 Cuadro de Disponibilidad (Horarios Clave con ⭐)")
-
-if st.button("🔄 Actualizar Cuadro de Disponibilidad"):
+st.subheader("👀 Cuadro de Disponibilidad")
+if st.button("🔄 Actualizar Cuadro"):
   st.rerun()
 
 try:
-  sheet_principal = sh.worksheet("Hoja1")
-  matriz_datos = sheet_principal.get("C1:AF26")
-
+  matriz_datos = obtener_matriz_hoja()
   datos_calendario = []
   for hora_etiqueta in HORARIOS_ESTRELLA:
     fila_actual = {"HORA": hora_etiqueta}
-
     for dia, cols in mapa_dias_bloques.items():
       clave_f = obtener_clave_fila(hora_etiqueta, dia)
       r_num = mapa_filas[clave_f]
       r_idx = r_num - 1
-
-      ocupaciones = []
-      libres_count = 0
-
+      ocupaciones, libres_count = [], 0
       for c_num in cols:
         c_idx = c_num - 3
-        val = ""
-        try:
-          val = matriz_datos[r_idx][c_idx]
-        except IndexError:
-          pass
-
+        val = (
+            matriz_datos[r_idx][c_idx]
+            if matriz_datos and len(matriz_datos) > r_idx
+            else ""
+        )
         if dia == "SÁBADO" and hora_etiqueta in [
             "2:30 p.m. (⭐ Viaje 3)",
             "4:30 p.m. (⭐ Viaje 4)",
         ]:
           fila_actual[dia] = "🚫 No laborable"
           continue
-
         if not es_reserva_real(val):
           libres_count += 1
         else:
@@ -691,11 +490,10 @@ try:
           fila_actual[dia] = (
               f"🟡 {libres_count} Libres | Ocup: {', '.join(ocupaciones)}"
           )
-
     datos_calendario.append(fila_actual)
 
-  df_calendario = pd.DataFrame(datos_calendario)
-  st.dataframe(df_calendario, hide_index=True, use_container_width=True)
-
+  st.dataframe(
+      pd.DataFrame(datos_calendario), hide_index=True, use_container_width=True
+  )
 except Exception as e:
-  st.warning(f"No se pudo cargar el cuadro de disponibilidad: {e}")
+  st.warning(f"No se pudo cargar el cuadro: {e}")
