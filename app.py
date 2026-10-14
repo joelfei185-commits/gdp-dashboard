@@ -12,10 +12,10 @@ st.set_page_config(
 )
 
 st.title("🏗️ LOGISTICA DE ENVIO FERRETERIA & HOMECENTER EL INDIO")
-st.markdown("Sincronización en vivo con Google Drive (Modo Web API Segura).")
+st.markdown("Sincronización en vivo con Google Drive.")
 
-# PEGA AQUÍ TU URL DE APPS SCRIPT (la que termina en /exec)
-WEB_APP_URL = "TU_URL_DE_APPS_SCRIPT_AQUI"
+# URL de tu Apps Script configurada
+WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyTrK1m9Rs1zSpUp1BRKn5WmSV-ixTrZ-R_yAng-xEGR_6NWYaz1T1W7uSjms5314U3/exec"
 
 
 def obtener_matriz_hoja():
@@ -448,55 +448,4 @@ with st.form("form_envio"):
       except Exception as e:
         st.error(f"Error al escribir en Google Drive: {e}")
 
-st.markdown("---")
-st.subheader("👀 Cuadro de Disponibilidad en Google Drive")
-if st.button("🔄 Actualizar Cuadro"):
-  st.rerun()
-
-try:
-  matriz_datos = obtener_matriz_hoja()
-  datos_calendario = []
-  for hora_etiqueta in HORARIOS_ESTRELLA:
-    fila_actual = {"HORA": hora_etiqueta}
-    for dia, cols in mapa_dias_bloques.items():
-      clave_f = obtener_clave_fila(hora_etiqueta, dia)
-      r_num = mapa_filas[clave_f]
-      r_idx = r_num - 1
-      ocupaciones, libres_count = [], 0
-      for c_num in cols:
-        c_idx = c_num - 3
-        val = (
-            matriz_datos[r_idx][c_idx]
-            if matriz_datos and len(matriz_datos) > r_idx
-            else ""
-        )
-        if dia == "SÁBADO" and hora_etiqueta in [
-            "2:30 p.m. (⭐ Viaje 3)",
-            "4:30 p.m. (⭐ Viaje 4)",
-        ]:
-          fila_actual[dia] = "🚫 No laborable"
-          continue
-        if not es_reserva_real(val):
-          libres_count += 1
-        else:
-          ocupaciones.append(str(val).split(" - ")[0])
-
-      if dia != "SÁBADO" or hora_etiqueta not in [
-          "2:30 p.m. (⭐ Viaje 3)",
-          "4:30 p.m. (⭐ Viaje 4)",
-      ]:
-        if libres_count == len(cols):
-          fila_actual[dia] = "🟢 Todo Libre (5)"
-        elif libres_count == 0:
-          fila_actual[dia] = f"🔴 Ocupado ({', '.join(ocupaciones)})"
-        else:
-          fila_actual[dia] = (
-              f"🟡 {libres_count} Libres | Ocup: {', '.join(ocupaciones)}"
-          )
-    datos_calendario.append(fila_actual)
-
-  st.dataframe(
-      pd.DataFrame(datos_calendario), hide_index=True, use_container_width=True
-  )
-except Exception as e:
-  st.warning(f"No se pudo cargar el cuadro desde Google Drive: {e}")
+st
