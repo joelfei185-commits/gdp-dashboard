@@ -17,29 +17,31 @@ st.set_page_config(
 st.title("🏗️ LOGISTICA DE ENVIO FERRETERIA & HOMECENTER EL INDIO")
 st.markdown("Sincronizado directamente con Google Drive.")
 
+# PEGA AQUÍ TODO EL TEXTO DE TU CREDENTIALS.JSON COMO UN DICCIONARIO DE PYTHON:
+CREDENCIALES_JSON = {
+    "type": "service_account",
+    "project_id": "PEGAR_AQUI_EL_PROJECT_ID",
+    "private_key_id": "PEGAR_AQUI_EL_PRIVATE_KEY_ID",
+    "private_key": "-----BEGIN PRIVATE KEY-----\nPEGAR_AQUI_LA_LLAVE_PRIVADA\n-----END PRIVATE KEY-----\n",
+    "client_email": "PEGAR_AQUI_EL_CLIENT_EMAIL",
+    "client_id": "PEGAR_AQUI_EL_CLIENT_ID",
+    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+    "token_uri": "https://oauth2.googleapis.com/token",
+    "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+    "client_x509_cert_url": "https://www.googleapis.com/certurl...",
+}
 
-# Conexión directa y robusta con Google Sheets
+
+# Conexión limpia leyendo directamente el diccionario interno
 @st.cache_resource
 def conectar_google_sheets():
   scope = [
       "https://spreadsheets.google.com/feeds",
       "https://www.googleapis.com/auth/drive",
   ]
-
-  # Opción A: Si existe el archivo físico en el repositorio
-  if os.path.exists("credentials.json"):
-    creds = service_account.Credentials.from_service_account_file(
-        "credentials.json", scopes=scope
-    )
-  # Opción B: Si se configuran los secretos en Streamlit Cloud
-  elif "gcp_service_account" in st.secrets:
-    creds_dict = dict(st.secrets["gcp_service_account"])
-    creds = service_account.Credentials.from_service_account_info(
-        creds_dict, scopes=scope
-    )
-  else:
-    raise FileNotFoundError("No se encontraron las credenciales de Google.")
-
+  creds = service_account.Credentials.from_service_account_info(
+      CREDENCIALES_JSON, scopes=scope
+  )
   client = gspread.authorize(creds)
   return client.open("CALCULO DE MATERIALES MAC")
 
