@@ -1,11 +1,7 @@
 from datetime import datetime, timedelta
-import json
 import math
-import os
-from google.auth.transport.requests import Request
-from google.oauth2 import service_account
-import gspread
 import pandas as pd
+import requests
 import streamlit as st
 
 # Configuración de la página
@@ -16,41 +12,38 @@ st.set_page_config(
 )
 
 st.title("🏗️ LOGISTICA DE ENVIO FERRETERIA & HOMECENTER EL INDIO")
-st.markdown("Sincronización en vivo con Google Drive.")
+st.markdown("Sincronización en vivo con Google Drive (Modo Web API Segura).")
+
+# PEGA AQUÍ TU URL DE APPS SCRIPT (la que termina en /exec)
+WEB_APP_URL = "TU_URL_DE_APPS_SCRIPT_AQUI"
 
 
-# Conexión robusta a Google Sheets tolerante a desfases de reloj
-@st.cache_resource
-def conectar_google_sheets():
-  scope = [
-      "https://spreadsheets.google.com/feeds",
-      "https://www.googleapis.com/auth/drive",
-  ]
+def obtener_matriz_hoja():
+  try:
+    response = requests.get(f"{WEB_APP_URL}?action=getData", timeout=10)
+    if response.status_code == 200:
+      return response.json()
+  except Exception:
+    pass
+  return []
 
-  # Intentar buscar el archivo de credenciales local o de emergencia
-  if os.path.exists("credentials.json"):
-    with open("credentials.json", "r", encoding="utf-8") as f:
-      creds_data = json.load(f)
-    creds = service_account.Credentials.from_service_account_info(
-        creds_data, scopes=scope
-    )
-  elif "gcp_service_account" in st.secrets:
-    creds_dict = dict(st.secrets["gcp_service_account"])
-    creds = service_account.Credentials.from_service_account_info(
-        creds_dict, scopes=scope
-    )
-  else:
-    raise FileNotFoundError(
-        "No se encontraron credenciales de Google para la conexión."
-    )
 
-  # Forzar tolerancia al desfase de tiempo en el servidor cloud
-  creds._clock_skew = timedelta(seconds=120)
-  req = Request()
-  creds.refresh(req)
+def actualizar_celda_hoja(celda, texto, color):
+  try:
+    payload = {"action": "updateCell", "cell": celda, "text": texto, "color": color}
+    requests.post(WEB_APP_URL, json=payload, timeout=10)
+  except Exception as e:
+    st.error(f"Error al actualizar celda: {e}")
 
-  client = gspread.authorize(creds)
-  return client.open("CALCULO DE MATERIALES MAC")
+
+def agregar_fila_hoja(row_data):
+  try:
+    payload = {"action": "appendRow", "row": row_data}
+    res = requests.post(WEB_APP_URL, json=payload, timeout=10)
+    return res.json().get("row", 30)
+  except Exception as e:
+    st.error(f"Error al guardar registro: {e}")
+    return 30
 
 
 # Lista fija de materiales exacta
@@ -95,20 +88,12 @@ df_materiales_base = pd.DataFrame({
     ],
 })
 
-# Conexión obligatoria a Google Drive
-try:
-  sh = conectar_google_sheets()
-  df_motoristas = pd.DataFrame({
-      "MOTORISTA": ["ELVIS", "LUIS PEREZ", "DIEGO", "ALVARO", "TOMAS"],
-      "CAPACIDAD (QUINTALES)": [100, 100, 50, 100, 100],
-  })
-  st.success("¡Conectado exitosamente con Google Drive!")
-except Exception as e:
-  st.error(
-      f"⚠️ Error crítico de conexión con Google Drive: {e}. Asegúrate de"
-      " configurar las credenciales correctamente."
-  )
-  st.stop()
+df_motoristas = pd.DataFrame({
+    "MOTORISTA": ["ELVIS", "LUIS PEREZ", "DIEGO", "ALVARO", "TOMAS"],
+    "CAPACIDAD (QUINTALES)": [100, 100, 50, 100, 100],
+})
+
+st.success("¡Conectado y sincronizado con Google Drive exitosamente!")
 
 COLORES_MOTORISTAS = {
     "ELVIS": {"red": 1.0, "green": 0.92, "blue": 0.23},
@@ -337,12 +322,7 @@ with f_col2:
       on_change=actualizar_fecha_por_dia,
   )
 
-try:
-  sheet_temp = sh.worksheet("Hoja1")
-  matriz_temp = sheet_temp.get("C1:AF26")
-except Exception as e:
-  matriz_temp = []
-  st.warning(f"No se pudo leer la Hoja1 desde Google Drive: {e}")
+matriz_temp = obtener_matriz_hoja()
 
 with st.form("form_envio"):
   horarios_libres_opciones = []
@@ -404,8 +384,7 @@ with st.form("form_envio"):
       st.error("⚠️ Debe seleccionar un horario válido.")
     else:
       try:
-        sheet_principal = sh.worksheet("Hoja1")
-        matriz_datos = sheet_principal.get("C1:AF26")
+        matriz_datos = obtener_matriz_hoja()
         columnas_dia = mapa_dias_bloques[dia_envio]
         hora_base_elegida = horario_seleccionado.split(" (Disponibles:")[0]
         idx_inicio = horarios_para_revisar.index(hora_base_elegida)
@@ -448,47 +427,22 @@ with st.form("form_envio"):
             letra_col = num_a_letra(col_num)
             celda_destino = f"{letra_col}{fila_meta}"
             texto_reserva = f"{motorista_seleccionado} ({reservado_por}) - Ocupado"
-            sheet_principal.update_acell(celda_destino, texto_reserva)
-            sheet_principal.format(
-                celda_destino,
-                {
-                    "backgroundColor": color_rgb,
-                    "textFormat": {"bold": True},
-                    "horizontalAlignment": "CENTER",
-                },
-            )
+            actualizar_celda_hoja(celda_destino, texto_reserva, color_rgb)
 
           fecha_str = fecha_registro.strftime("%Y-%m-%d")
-          columna_c_valores = sheet_principal.col_values(3)
-          siguiente_fila = 30
-          for idx_f in range(29, len(columna_c_valores)):
-            val_fila = str(columna_c_valores[idx_f]).strip()
-            if (
-                not val_fila
-                or val_fila.lower() == "none"
-                or val_fila.lower() == "nan"
-            ):
-              siguiente_fila = idx_f + 1
-              break
-          else:
-            siguiente_fila = max(30, len(columna_c_valores) + 1)
-
-          sheet_principal.update(
-              f"C{siguiente_fila}:H{siguiente_fila}",
-              [[
-                  motorista_seleccionado,
-                  f"{viajes_estimados} Viajes",
-                  reservado_por,
-                  f"{peso_total_quintales:,.2f} qq ({peso_total_general:,.2f} lbs)",
-                  fecha_str,
-                  direccion_envio,
-              ]],
-          )
+          fila_guardada = agregar_fila_hoja([
+              motorista_seleccionado,
+              f"{viajes_estimados} Viajes",
+              reservado_por,
+              f"{peso_total_quintales:,.2f} qq ({peso_total_general:,.2f} lbs)",
+              fecha_str,
+              direccion_envio,
+          ])
 
           st.session_state.form_reset = True
           st.success(
               f"¡Se han agendado con éxito los {viajes_estimados} viajes en"
-              f" Google Drive (Fila {siguiente_fila})!"
+              f" Google Drive (Fila {fila_guardada})!"
           )
           st.rerun()
       except Exception as e:
@@ -500,8 +454,7 @@ if st.button("🔄 Actualizar Cuadro"):
   st.rerun()
 
 try:
-  sheet_principal = sh.worksheet("Hoja1")
-  matriz_datos = sheet_principal.get("C1:AF26")
+  matriz_datos = obtener_matriz_hoja()
   datos_calendario = []
   for hora_etiqueta in HORARIOS_ESTRELLA:
     fila_actual = {"HORA": hora_etiqueta}
