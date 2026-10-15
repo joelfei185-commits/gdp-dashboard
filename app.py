@@ -123,6 +123,7 @@ def agregar_fila_hoja(row_data):
     return 30
 
 
+# FLOTA DE MOTORISTAS (Diego con 50 qq / Camión Pequeño)
 df_motoristas = pd.DataFrame({
     "MOTORISTA": ["ELVIS", "LUIS PEREZ", "DIEGO", "ALVARO", "TOMAS"],
     "CAPACIDAD (QUINTALES)": [100, 100, 50, 100, 100],
