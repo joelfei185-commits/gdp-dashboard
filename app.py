@@ -340,6 +340,13 @@ with col2:
       value=f"{peso_total_quintales:,.2f} qq ({peso_total_general:,.2f} lbs)",
   )
 
+  # --- ALERTA VISUAL DE VIAJES ESTIMADOS ---
+  if peso_total_general > 0:
+    st.info(
+        f"🚚 **{motorista_seleccionado}** (Capacidad: {capacidad_quintales} qq)"
+        f" hará este envío en **{viajes_estimados} Viaje(s)**."
+    )
+
 st.markdown("---")
 st.subheader("📅 Reserva de Espacio en el Calendario y Registro en Hoja 1")
 
