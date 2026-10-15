@@ -12,13 +12,26 @@ st.set_page_config(
     layout="wide",
 )
 
+# --- ESTILOS CSS PARA AGRANDAR EL LOGO ---
+st.markdown(
+    """
+    <style>
+        /* Ajusta el tamaño del contenedor del logo lateral/superior */
+        [data-testid="stLogo"] img {
+            width: 100% !important;
+            max-width: 320px !important; /* Puedes subir o bajar este valor si lo deseas */
+            height: auto !important;
+        }
+    </style>
+""",
+    unsafe_allow_html=True,
+)
+
 # --- CONFIGURACIÓN DEL LOGO (Opción 2: st.logo) ---
-# Asegúrate de subir una imagen llamada 'logo.png' en la misma carpeta de tu app en GitHub
 try:
   logo_img = Image.open("logo.png")
   st.logo(logo_img)
 except Exception:
-  # Si por alguna razón no encuentra el archivo logo.png todavía, no detiene la app
   pass
 
 # Título centrado corporativo
