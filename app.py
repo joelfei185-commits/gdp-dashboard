@@ -5,7 +5,7 @@ from PIL import Image
 import requests
 import streamlit as st
 
-# Configuración de la página con icono de ferretería
+# Configuración de la página
 st.set_page_config(
     page_title="Logística de Envío - Ferretería & Homecenter El Indio",
     page_icon="🧰",
@@ -17,7 +17,7 @@ try:
   logo_img = Image.open("logo.png")
   col_a, col_b, col_c = st.columns([2, 1, 2])
   with col_b:
-    st.image(logo_img, width=220)  # Tamaño perfecto y balanceado
+    st.image(logo_img, width=220)
 except Exception:
   pass
 
@@ -47,7 +47,7 @@ def obtener_matriz_hoja():
   return []
 
 
-# Función para cargar materiales dinámicamente desde la pestaña "Materiales" de Google Drive
+# Carga dinámica de materiales
 @st.cache_data(ttl=30)
 def obtener_materiales_desde_drive():
   try:
@@ -59,7 +59,6 @@ def obtener_materiales_desde_drive():
   except Exception:
     pass
 
-  # Respaldo por seguridad si la pestaña aún no responde
   return pd.DataFrame({
       "MATERIAL": [
           "CEMENTO",
@@ -188,10 +187,24 @@ def es_reserva_real(val):
   val_str = str(val).strip()
   if val_str.lower() in ["none", "nan", ""]:
     return False
+
   val_upper = val_str.upper()
-  for mot in ["ELVIS", "LUIS PEREZ", "DIEGO", "ALVARO", "TOMAS"]:
+
+  # Si la celda solo contiene el texto de la hora o almuerzo, no se considera una reserva ocupada
+  if any(
+      h in val_upper
+      for h in ["8:00 A.M.", "10:00 A.M.", "2:30 P.M.", "4:30 P.M.", "ALMUERZO"]
+  ):
+    if not any(
+        mot in val_upper
+        for mot in ["ELVIS", "LUIS PEREZ", "DIEGO", "ALVARO", "TOMAS"]
+    ):
+      return False
+
+  for mot in ["ELVIS", "LUIS PEREZ", "DIEGO", "ALVARO", "TOMAS", "OCUPADO"]:
     if mot in val_upper:
       return True
+
   return False
 
 
@@ -340,7 +353,6 @@ with col2:
       value=f"{peso_total_quintales:,.2f} qq ({peso_total_general:,.2f} lbs)",
   )
 
-  # --- ALERTA VISUAL DE VIAJES ESTIMADOS ---
   if peso_total_general > 0:
     st.info(
         f"🚚 **{motorista_seleccionado}** (Capacidad: {capacidad_quintales} qq)"
