@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 import math
 import pandas as pd
+from PIL import Image
 import requests
 import streamlit as st
 
@@ -11,9 +12,18 @@ st.set_page_config(
     layout="wide",
 )
 
-# Título centrado con icono corporativo
+# --- CONFIGURACIÓN DEL LOGO (Opción 2: st.logo) ---
+# Asegúrate de subir una imagen llamada 'logo.png' en la misma carpeta de tu app en GitHub
+try:
+  logo_img = Image.open("logo.png")
+  st.logo(logo_img)
+except Exception:
+  # Si por alguna razón no encuentra el archivo logo.png todavía, no detiene la app
+  pass
+
+# Título centrado corporativo
 st.markdown(
-    "<h1 style='text-align: center;'>🧰 LOGÍSTICA DE ENVÍO FERRETERÍA &"
+    "<h1 style='text-align: center;'>LOGÍSTICA DE ENVÍO FERRETERÍA &"
     " HOMECENTER EL INDIO</h1>",
     unsafe_allow_html=True,
 )
