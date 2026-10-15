@@ -12,13 +12,12 @@ st.set_page_config(
     layout="wide",
 )
 
-# --- LOGO CENTRADO Y AGRANDADO EN EL CUERPO ---
+# --- LOGO CENTRADO Y EN TAMAÑO IDEAL ---
 try:
-  # Carga tu imagen 'logo.png'
   logo_img = Image.open("logo.png")
-  col_a, col_b, col_c = st.columns([1, 2, 1])
+  col_a, col_b, col_c = st.columns([2, 1, 2])
   with col_b:
-    st.image(logo_img, use_container_width=True)
+    st.image(logo_img, width=220)  # Tamaño perfecto y balanceado
 except Exception:
   pass
 
