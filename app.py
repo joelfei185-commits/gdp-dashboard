@@ -11,15 +11,15 @@ st.set_page_config(
     layout="wide",
 )
 
-# Título centrado con icono de herramientas
+# Título centrado con icono corporativo
 st.markdown(
     "<h1 style='text-align: center;'>🧰 LOGÍSTICA DE ENVÍO FERRETERÍA &"
     " HOMECENTER EL INDIO</h1>",
     unsafe_allow_html=True,
 )
 st.markdown(
-    "<p style='text-align: center; color: gray;'>Sincronización en vivo con"
-    " Google Drive.</p>",
+    "<p style='text-align: center; color: gray;'>Sincronización dinámica en"
+    " vivo con Google Drive.</p>",
     unsafe_allow_html=True,
 )
 
@@ -35,6 +35,64 @@ def obtener_matriz_hoja():
   except Exception:
     pass
   return []
+
+
+# Función para cargar materiales dinámicamente desde la pestaña "Materiales" de Google Drive
+@st.cache_data(ttl=30)
+def obtener_materiales_desde_drive():
+  try:
+    response = requests.get(f"{WEB_APP_URL}?action=getMateriales", timeout=10)
+    if response.status_code == 200:
+      data = response.json()
+      if data and len(data) > 0:
+        return pd.DataFrame(data)
+  except Exception:
+    pass
+
+  # Respaldo por seguridad si la pestaña aún no responde
+  return pd.DataFrame({
+      "MATERIAL": [
+          "CEMENTO",
+          "H. 3/8",
+          "H. 1/4",
+          "H. 1/2",
+          "BLOCK 10",
+          "SOLERA 10",
+          "MITAD 10",
+          "BLOCK 15",
+          "SOLERA 15",
+          "MITAD 15",
+          "BLOCK 20",
+          "SOLERA 20",
+          "MITAD 20",
+          "LADRILLO",
+          "GRAVA",
+          "ARENA",
+          "DECOBLOCK",
+      ],
+      "LBS": [
+          93.5,
+          7.142857143,
+          3.333333333,
+          12.5,
+          20.0,
+          20.0,
+          10.0,
+          25.0,
+          25.0,
+          13.0,
+          30.0,
+          34.0,
+          16.0,
+          8.0,
+          40.0,
+          40.0,
+          88.0,
+      ],
+  })
+
+
+df_materiales_base = obtener_materiales_desde_drive()
 
 
 def actualizar_celda_hoja(celda, texto, color):
@@ -54,48 +112,6 @@ def agregar_fila_hoja(row_data):
     st.error(f"Error al guardar registro: {e}")
     return 30
 
-
-# Lista fija de materiales exacta
-df_materiales_base = pd.DataFrame({
-    "MATERIAL": [
-        "CEMENTO",
-        "H. 3/8",
-        "H. 1/4",
-        "H. 1/2",
-        "BLOCK 10",
-        "SOLERA 10",
-        "MITAD 10",
-        "BLOCK 15",
-        "SOLERA 15",
-        "MITAD 15",
-        "BLOCK 20",
-        "SOLERA 20",
-        "MITAD 20",
-        "LADRILLO",
-        "GRAVA",
-        "ARENA",
-        "DECOBLOCK",
-    ],
-    "LBS": [
-        93.5,
-        7.142857143,
-        3.333333333,
-        12.5,
-        20.0,
-        20.0,
-        10.0,
-        25.0,
-        25.0,
-        13.0,
-        30.0,
-        34.0,
-        16.0,
-        8.0,
-        40.0,
-        40.0,
-        88.0,
-    ],
-})
 
 df_motoristas = pd.DataFrame({
     "MOTORISTA": ["ELVIS", "LUIS PEREZ", "DIEGO", "ALVARO", "TOMAS"],
@@ -490,7 +506,8 @@ try:
 
       if dia != "SÁBADO" or hora_etiqueta not in [
           "2:30 p.m. (⭐ Viaje 3)",
-          "4:30 p.m. (⭐ Viaje 4)"]:
+          "4:30 p.m. (⭐ Viaje 4)",
+      ]:
         if libres_count == len(cols):
           fila_actual[dia] = "🟢 Todo Libre (5)"
         elif libres_count == 0:
