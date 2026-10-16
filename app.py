@@ -34,7 +34,6 @@ menu_opcion = st.sidebar.radio(
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 📅 Control de Semana")
 
-# Fechas base para calcular las semanas del mes actual (ej. Octubre 2026)
 hoy = datetime.now()
 mes_actual_nombre = [
     "Enero",
@@ -156,9 +155,15 @@ def obtener_materiales_desde_drive():
 df_materiales_base = obtener_materiales_desde_drive()
 
 
-def actualizar_celda_hoja(celda, texto, color):
+def actualizar_celda_hoja(celda, texto, color, nombre_hoja="Hoja1"):
   try:
-    payload = {"action": "updateCell", "cell": celda, "text": texto, "color": color}
+    payload = {
+        "action": "updateCell",
+        "cell": celda,
+        "text": texto,
+        "color": color,
+        "sheet": nombre_hoja,
+    }
     requests.post(WEB_APP_URL, json=payload, timeout=10)
   except Exception as e:
     st.error(f"Error al actualizar celda: {e}")
@@ -536,7 +541,9 @@ if menu_opcion == "🚛 Logística y Reservas":
               texto_reserva = (
                   f"{motorista_seleccionado} ({reservado_por}) - Ocupado"
               )
-              actualizar_celda_hoja(celda_destino, texto_reserva, color_rgb)
+              actualizar_celda_hoja(
+                  celda_destino, texto_reserva, color_rgb, semana_seleccionada
+              )
 
             fecha_str = fecha_registro.strftime("%Y-%m-%d")
             fila_guardada = agregar_fila_hoja([
@@ -552,7 +559,7 @@ if menu_opcion == "🚛 Logística y Reservas":
             st.session_state.form_reset = True
             st.success(
                 f"¡Se han agendado con éxito los {viajes_estimados} viajes en"
-                f" Google Drive ({semana_seleccion_nombre if 'semana_seleccion_nombre' in locals() else semana_seleccionada})!"
+                f" Google Drive ({semana_seleccionada})!"
             )
             st.rerun()
         except Exception as e:
