@@ -12,6 +12,21 @@ st.set_page_config(
     layout="wide",
 )
 
+# --- MENÚ LATERAL (OPCIÓN B) ---
+st.sidebar.markdown(
+    "<h2 style='text-align: center; color: #1f4e78;'>EL INDIO ®</h2>",
+    unsafe_allow_html=True,
+)
+st.sidebar.markdown("---")
+menu_opcion = st.sidebar.radio(
+    "Menú de Navegación",
+    [
+        "🚛 Logística y Reservas",
+        "📦 Consulta de Materiales",
+        "📊 Reportes Mensuales",
+    ],
+)
+
 # --- LOGO CENTRADO Y EN TAMAÑO IDEAL ---
 try:
   logo_img = Image.open("logo.png")
@@ -47,7 +62,7 @@ def obtener_matriz_hoja():
   return []
 
 
-# Carga dinámica de materiales
+# Carga dinámica de materiales desde Google Drive
 @st.cache_data(ttl=30)
 def obtener_materiales_desde_drive():
   try:
@@ -190,7 +205,6 @@ def es_reserva_real(val):
 
   val_upper = val_str.upper()
 
-  # Si la celda solo contiene el texto de la hora o almuerzo, no se considera una reserva ocupada
   if any(
       h in val_upper
       for h in ["8:00 A.M.", "10:00 A.M.", "2:30 P.M.", "4:30 P.M.", "ALMUERZO"]
@@ -208,348 +222,375 @@ def es_reserva_real(val):
   return False
 
 
-# --- ESTADOS DE SESIÓN ---
-if "form_reset" not in st.session_state:
-  st.session_state.form_reset = False
+# --- CONTENIDO SEGÚN MENÚ SELECCIONADO ---
+if menu_opcion == "🚛 Logística y Reservas":
 
-if st.session_state.form_reset:
-  st.session_state.reservado_por_input = ""
-  st.session_state.direccion_input = ""
-  for idx_m in range(len(df_materiales_base)):
-    st.session_state[f"p1_{idx_m}"] = 0.0
-    st.session_state[f"p2_{idx_m}"] = 0.0
-  st.session_state.form_reset = False
+  # --- ESTADOS DE SESIÓN ---
+  if "form_reset" not in st.session_state:
+    st.session_state.form_reset = False
 
-dias_semana_map = {
-    0: "LUNES",
-    1: "MARTES",
-    2: "MIÉRCOLES",
-    3: "JUEVES",
-    4: "VIERNES",
-    5: "SÁBADO",
-}
-dias_inverso_map = {
-    "LUNES": 0,
-    "MARTES": 1,
-    "MIÉRCOLES": 2,
-    "JUEVES": 3,
-    "VIERNES": 4,
-    "SÁBADO": 5,
-}
+  if st.session_state.form_reset:
+    st.session_state.reservado_por_input = ""
+    st.session_state.direccion_input = ""
+    for idx_m in range(len(df_materiales_base)):
+      st.session_state[f"p1_{idx_m}"] = 0.0
+      st.session_state[f"p2_{idx_m}"] = 0.0
+    st.session_state.form_reset = False
 
-hoy = datetime.now()
-lunes_actual = hoy - timedelta(days=hoy.weekday())
+  dias_semana_map = {
+      0: "LUNES",
+      1: "MARTES",
+      2: "MIÉRCOLES",
+      3: "JUEVES",
+      4: "VIERNES",
+      5: "SÁBADO",
+  }
+  dias_inverso_map = {
+      "LUNES": 0,
+      "MARTES": 1,
+      "MIÉRCOLES": 2,
+      "JUEVES": 3,
+      "VIERNES": 4,
+      "SÁBADO": 5,
+  }
 
-if "fecha_seleccionada" not in st.session_state:
-  st.session_state.fecha_seleccionada = hoy.date()
+  hoy = datetime.now()
+  lunes_actual = hoy - timedelta(days=hoy.weekday())
 
-if "dia_seleccionado" not in st.session_state:
-  num_dia = hoy.weekday()
-  st.session_state.dia_seleccionado = (
-      dias_semana_map.get(num_dia, "LUNES") if num_dia <= 5 else "LUNES"
-  )
+  if "fecha_seleccionada" not in st.session_state:
+    st.session_state.fecha_seleccionada = hoy.date()
 
-
-def actualizar_fecha_por_dia():
-  dia = st.session_state.widget_dia_envio
-  delta_dias = dias_inverso_map.get(dia, 0)
-  st.session_state.fecha_seleccionada = (
-      lunes_actual + timedelta(days=delta_dias)
-  ).date()
-
-
-def actualizar_dia_por_fecha():
-  nueva_fecha = st.session_state.widget_fecha_envio
-  num_dia_semana = nueva_fecha.weekday()
-  if num_dia_semana <= 5:
-    st.session_state.widget_dia_envio = dias_semana_map.get(
-        num_dia_semana, "LUNES"
+  if "dia_seleccionado" not in st.session_state:
+    num_dia = hoy.weekday()
+    st.session_state.dia_seleccionado = (
+        dias_semana_map.get(num_dia, "LUNES") if num_dia <= 5 else "LUNES"
     )
-  else:
-    st.session_state.widget_dia_envio = "LUNES"
 
 
-# --- INTERFAZ ---
-col1, col2 = st.columns(2)
+  def actualizar_fecha_por_dia():
+    dia = st.session_state.widget_dia_envio
+    delta_dias = dias_inverso_map.get(dia, 0)
+    st.session_state.fecha_seleccionada = (
+        lunes_actual + timedelta(days=delta_dias)
+    ).date()
 
-with col1:
-  st.subheader("📦 Ingreso de Materiales (Pedido Principal)")
-  cantidades_p1 = []
-  for index, row in df_materiales_base.iterrows():
-    mat_nombre = str(row["MATERIAL"])
-    mat_lbs = float(row["LBS"])
-    key_p1 = f"p1_{index}"
-    if key_p1 not in st.session_state:
-      st.session_state[key_p1] = 0.0
-    cant = st.number_input(
-        f"{mat_nombre} (P. unidad: {mat_lbs:.2f} lbs)",
-        min_value=0.0,
-        step=1.0,
-        key=key_p1,
-    )
-    cantidades_p1.append(cant)
 
-  df_p1 = df_materiales_base.copy()
-  df_p1["CANTIDAD"] = cantidades_p1
-  df_p1["TOTAL QT"] = df_p1["CANTIDAD"] * df_p1["LBS"]
-
-with col2:
-  st.subheader("🚛 Resumen y Estado de Carga")
-  motorista_seleccionado = st.selectbox(
-      "Seleccione Motorista", df_motoristas["MOTORISTA"]
-  )
-  capacidad_quintales = float(
-      df_motoristas[df_motoristas["MOTORISTA"] == motorista_seleccionado][
-          "CAPACIDAD (QUINTALES)"
-      ].values[0]
-  )
-  capacidad_en_libras = capacidad_quintales * 100
-
-  peso_principal = df_p1["TOTAL QT"].sum()
-  viajes_estimados = 1
-  if capacidad_en_libras > 0 and peso_principal > 0:
-    viajes_estimados = max(1, math.ceil(peso_principal / capacidad_en_libras))
-
-  cantidades_p2 = [0.0] * len(df_materiales_base)
-  if peso_principal > 0 and capacidad_en_libras > 0:
-    with st.expander(
-        "➕ Añadir Materiales Extra / Rellenar Viaje Incompleto"
-    ):
-      viajes_disponibles_opciones = [
-          f"Viaje {i+1}" for i in range(viajes_estimados)
-      ]
-      viaje_a_rellenar = st.selectbox(
-          "Elegir Viaje a Completar", viajes_disponibles_opciones
+  def actualizar_dia_por_fecha():
+    nueva_fecha = st.session_state.widget_fecha_envio
+    num_dia_semana = nueva_fecha.weekday()
+    if num_dia_semana <= 5:
+      st.session_state.widget_dia_envio = dias_semana_map.get(
+          num_dia_semana, "LUNES"
       )
-      cantidades_p2 = []
-      for index, row in df_materiales_base.iterrows():
-        mat_nombre = str(row["MATERIAL"])
-        key_p2 = f"p2_{index}"
-        if key_p2 not in st.session_state:
-          st.session_state[key_p2] = 0.0
-        cant_comp = st.number_input(
-            f"Extra: {mat_nombre}",
-            min_value=0.0,
-            step=1.0,
-            key=key_p2,
-        )
-        cantidades_p2.append(cant_comp)
-
-  df_p2 = df_materiales_base.copy()
-  df_p2["CANTIDAD"] = cantidades_p2
-  df_p2["TOTAL QT"] = df_p2["CANTIDAD"] * df_p2["LBS"]
-
-  df_total_general = df_p1.copy()
-  df_total_general["CANTIDAD"] = df_p1["CANTIDAD"] + df_p2["CANTIDAD"]
-  df_total_general["TOTAL QT"] = (
-      df_total_general["CANTIDAD"] * df_total_general["LBS"]
-  )
-
-  peso_total_general = df_total_general["TOTAL QT"].sum()
-  peso_total_quintales = peso_total_general / 100
-
-  st.metric(
-      label="Peso Total de Carga (Principal + Extras)",
-      value=f"{peso_total_quintales:,.2f} qq ({peso_total_general:,.2f} lbs)",
-  )
-
-  if peso_total_general > 0:
-    st.info(
-        f"🚚 **{motorista_seleccionado}** (Capacidad: {capacidad_quintales} qq)"
-        f" hará este envío en **{viajes_estimados} Viaje(s)**."
-    )
-
-st.markdown("---")
-st.subheader("📅 Reserva de Espacio en el Calendario y Registro en Hoja 1")
-
-f_col1, f_col2 = st.columns(2)
-with f_col1:
-  fecha_registro = st.date_input(
-      "Fecha a Hacer el Viaje",
-      key="widget_fecha_envio",
-      on_change=actualizar_dia_por_fecha,
-  )
-with f_col2:
-  dia_envio = st.selectbox(
-      "Día de la semana",
-      ["LUNES", "MARTES", "MIÉRCOLES", "JUEVES", "VIERNES", "SÁBADO"],
-      key="widget_dia_envio",
-      on_change=actualizar_fecha_por_dia,
-  )
-
-matriz_temp = obtener_matriz_hoja()
-
-with st.form("form_envio"):
-  horarios_libres_opciones = []
-  horarios_para_revisar = (
-      ["8:00 a.m. (⭐ Viaje 1)", "10:00 a.m. (⭐ Viaje 2)"]
-      if dia_envio == "SÁBADO"
-      else HORARIOS_ESTRELLA
-  )
-  columnas_del_dia = mapa_dias_bloques.get(dia_envio, [])
-
-  for hora_b in horarios_para_revisar:
-    clave_fila_rev = obtener_clave_fila(hora_b, dia_envio)
-    fila_meta_rev = mapa_filas.get(clave_fila_rev, 0)
-    row_idx_rev = fila_meta_rev - 1
-
-    espacios_libres_en_hora = 0
-    if matriz_temp and len(matriz_temp) > row_idx_rev:
-      for c_num in columnas_del_dia:
-        c_idx_rev = c_num - 3
-        try:
-          val_celda = matriz_temp[row_idx_rev][c_idx_rev]
-        except IndexError:
-          val_celda = ""
-        if not es_reserva_real(val_celda):
-          espacios_libres_en_hora += 1
     else:
-      espacios_libres_en_hora = 5
+      st.session_state.widget_dia_envio = "LUNES"
 
-    if espacios_libres_en_hora > 0:
-      horarios_libres_opciones.append(
-          f"{hora_b} (Disponibles: {espacios_libres_en_hora}/5)"
+
+  # --- INTERFAZ DE LOGÍSTICA ---
+  col1, col2 = st.columns(2)
+
+  with col1:
+    st.subheader("📦 Ingreso de Materiales (Pedido Principal)")
+    cantidades_p1 = []
+    for index, row in df_materiales_base.iterrows():
+      mat_nombre = str(row["MATERIAL"])
+      mat_lbs = float(row["LBS"])
+      key_p1 = f"p1_{index}"
+      if key_p1 not in st.session_state:
+        st.session_state[key_p1] = 0.0
+      cant = st.number_input(
+          f"{mat_nombre} (P. unidad: {mat_lbs:.2f} lbs)",
+          min_value=0.0,
+          step=1.0,
+          key=key_p1,
       )
+      cantidades_p1.append(cant)
 
-  horario_seleccionado = (
-      st.selectbox("Seleccione Horario Disponible", horarios_libres_opciones)
-      if horarios_libres_opciones
-      else None
-  )
-  if not horarios_libres_opciones:
-    st.warning(f"⚠️ No hay horarios disponibles para el día {dia_envio}.")
+    df_p1 = df_materiales_base.copy()
+    df_p1["CANTIDAD"] = cantidades_p1
+    df_p1["TOTAL QT"] = df_p1["CANTIDAD"] * df_p1["LBS"]
 
-  reservado_por = st.text_input(
-      "Nombre de Quien Reserva", key="reservado_por_input"
-  )
-  direccion_envio = st.text_input(
-      "Dirección de Destino / Entrega", key="direccion_input"
-  )
+  with col2:
+    st.subheader("🚛 Resumen y Estado de Carga")
+    motorista_seleccionado = st.selectbox(
+        "Seleccione Motorista", df_motoristas["MOTORISTA"]
+    )
+    capacidad_quintales = float(
+        df_motoristas[df_motoristas["MOTORISTA"] == motorista_seleccionado][
+            "CAPACIDAD (QUINTALES)"
+        ].values[0]
+    )
+    capacidad_en_libras = capacidad_quintales * 100
 
-  submitted = st.form_submit_button("Agendar Viajes y Guardar en Google Drive")
+    peso_principal = df_p1["TOTAL QT"].sum()
+    viajes_estimados = 1
+    if capacidad_en_libras > 0 and peso_principal > 0:
+      viajes_estimados = max(1, math.ceil(peso_principal / capacidad_en_libras))
 
-  if submitted:
-    if peso_total_general == 0:
-      st.warning("Debe seleccionar al menos un material.")
-    elif not reservado_por.strip():
-      st.warning("Debe indicar el nombre de quien reserva.")
-    elif not direccion_envio.strip():
-      st.warning("Debe indicar la dirección de destino.")
-    elif not horario_seleccionado:
-      st.error("⚠️ Debe seleccionar un horario válido.")
-    else:
-      try:
-        matriz_datos = obtener_matriz_hoja()
-        columnas_dia = mapa_dias_bloques[dia_envio]
-        hora_base_elegida = horario_seleccionado.split(" (Disponibles:")[0]
-        idx_inicio = horarios_para_revisar.index(hora_base_elegida)
-
-        horarios_a_reservar = [
-            horarios_para_revisar[idx_inicio + i] for i in range(viajes_estimados)
+    cantidades_p2 = [0.0] * len(df_materiales_base)
+    if peso_principal > 0 and capacidad_en_libras > 0:
+      with st.expander(
+          "➕ Añadir Materiales Extra / Rellenar Viaje Incompleto"
+      ):
+        viajes_disponibles_opciones = [
+            f"Viaje {i+1}" for i in range(viajes_estimados)
         ]
-        espacios_totales_encontrados = []
-
-        for hora_b in horarios_a_reservar:
-          clave_f = obtener_clave_fila(hora_b, dia_envio)
-          fila_meta = mapa_filas[clave_f]
-          row_idx = fila_meta - 1
-          col_encontrada = None
-          for col_num in columnas_dia:
-            col_idx = col_num - 3
-            val = (
-                matriz_datos[row_idx][col_idx]
-                if matriz_datos and len(matriz_datos) > row_idx
-                else ""
-            )
-            if not es_reserva_real(val):
-              col_encontrada = col_num
-              break
-          if col_encontrada:
-            espacios_totales_encontrados.append(
-                (col_encontrada, fila_meta, hora_b)
-            )
-
-        if len(espacios_totales_encontrados) < viajes_estimados:
-          st.error(
-              "⚠️ Algunos de los horarios consecutivos seleccionados ya"
-              " fueron ocupados."
-          )
-        else:
-          color_rgb = COLORES_MOTORISTAS.get(
-              motorista_seleccionado, {"red": 1.0, "green": 1.0, "blue": 1.0}
-          )
-          for col_num, fila_meta, hora_b in espacios_totales_encontrados:
-            letra_col = num_a_letra(col_num)
-            celda_destino = f"{letra_col}{fila_meta}"
-            texto_reserva = f"{motorista_seleccionado} ({reservado_por}) - Ocupado"
-            actualizar_celda_hoja(celda_destino, texto_reserva, color_rgb)
-
-          fecha_str = fecha_registro.strftime("%Y-%m-%d")
-          fila_guardada = agregar_fila_hoja([
-              motorista_seleccionado,
-              f"{viajes_estimados} Viajes",
-              reservado_por,
-              f"{peso_total_quintales:,.2f} qq ({peso_total_general:,.2f} lbs)",
-              fecha_str,
-              direccion_envio,
-          ])
-
-          st.session_state.form_reset = True
-          st.success(
-              f"¡Se han agendado con éxito los {viajes_estimados} viajes en"
-              f" Google Drive (Fila {fila_guardada})!"
-          )
-          st.rerun()
-      except Exception as e:
-        st.error(f"Error al escribir en Google Drive: {e}")
-
-st.markdown("---")
-st.subheader("👀 Cuadro de Disponibilidad en Google Drive")
-
-try:
-  matriz_datos = obtener_matriz_hoja()
-  datos_calendario = []
-  for hora_etiqueta in HORARIOS_ESTRELLA:
-    fila_actual = {"HORA": hora_etiqueta}
-    for dia, cols in mapa_dias_bloques.items():
-      clave_f = obtener_clave_fila(hora_etiqueta, dia)
-      r_num = mapa_filas[clave_f]
-      r_idx = r_num - 1
-      ocupaciones, libres_count = [], 0
-      for c_num in cols:
-        c_idx = c_num - 3
-        val = (
-            matriz_datos[r_idx][c_idx]
-            if matriz_datos and len(matriz_datos) > r_idx
-            else ""
+        viaje_a_rellenar = st.selectbox(
+            "Elegir Viaje a Completar", viajes_disponibles_opciones
         )
-        if dia == "SÁBADO" and hora_etiqueta in [
+        cantidades_p2 = []
+        for index, row in df_materiales_base.iterrows():
+          mat_nombre = str(row["MATERIAL"])
+          key_p2 = f"p2_{index}"
+          if key_p2 not in st.session_state:
+            st.session_state[key_p2] = 0.0
+          cant_comp = st.number_input(
+              f"Extra: {mat_nombre}",
+              min_value=0.0,
+              step=1.0,
+              key=key_p2,
+          )
+          cantidades_p2.append(cant_comp)
+
+    df_p2 = df_materiales_base.copy()
+    df_p2["CANTIDAD"] = cantidades_p2
+    df_p2["TOTAL QT"] = df_p2["CANTIDAD"] * df_p2["LBS"]
+
+    df_total_general = df_p1.copy()
+    df_total_general["CANTIDAD"] = df_p1["CANTIDAD"] + df_p2["CANTIDAD"]
+    df_total_general["TOTAL QT"] = (
+        df_total_general["CANTIDAD"] * df_total_general["LBS"]
+    )
+
+    peso_total_general = df_total_general["TOTAL QT"].sum()
+    peso_total_quintales = peso_total_general / 100
+
+    st.metric(
+        label="Peso Total de Carga (Principal + Extras)",
+        value=f"{peso_total_quintales:,.2f} qq ({peso_total_general:,.2f} lbs)",
+    )
+
+    if peso_total_general > 0:
+      st.info(
+          f"🚚 **{motorista_seleccionado}** (Capacidad: {capacidad_quintales}"
+          f" qq) hará este envío en **{viajes_estimados} Viaje(s)**."
+      )
+
+  st.markdown("---")
+  st.subheader("📅 Reserva de Espacio en el Calendario y Registro en Hoja 1")
+
+  f_col1, f_col2 = st.columns(2)
+  with f_col1:
+    fecha_registro = st.date_input(
+        "Fecha a Hacer el Viaje",
+        key="widget_fecha_envio",
+        on_change=actualizar_dia_por_fecha,
+    )
+  with f_col2:
+    dia_envio = st.selectbox(
+        "Día de la semana",
+        ["LUNES", "MARTES", "MIÉRCOLES", "JUEVES", "VIERNES", "SÁBADO"],
+        key="widget_dia_envio",
+        on_change=actualizar_fecha_por_dia,
+    )
+
+  matriz_temp = obtener_matriz_hoja()
+
+  with st.form("form_envio"):
+    horarios_libres_opciones = []
+    horarios_para_revisar = (
+        ["8:00 a.m. (⭐ Viaje 1)", "10:00 a.m. (⭐ Viaje 2)"]
+        if dia_envio == "SÁBADO"
+        else HORARIOS_ESTRELLA
+    )
+    columnas_del_dia = mapa_dias_bloques.get(dia_envio, [])
+
+    for hora_b in horarios_para_revisar:
+      clave_fila_rev = obtener_clave_fila(hora_b, dia_envio)
+      fila_meta_rev = mapa_filas.get(clave_fila_rev, 0)
+      row_idx_rev = fila_meta_rev - 1
+
+      espacios_libres_en_hora = 0
+      if matriz_temp and len(matriz_temp) > row_idx_rev:
+        for c_num in columnas_del_dia:
+          c_idx_rev = c_num - 3
+          try:
+            val_celda = matriz_temp[row_idx_rev][c_idx_rev]
+          except IndexError:
+            val_celda = ""
+          if not es_reserva_real(val_celda):
+            espacios_libres_en_hora += 1
+      else:
+        espacios_libres_en_hora = 5
+
+      if espacios_libres_en_hora > 0:
+        horarios_libres_opciones.append(
+            f"{hora_b} (Disponibles: {espacios_libres_en_hora}/5)"
+        )
+
+    horario_seleccionado = (
+        st.selectbox("Seleccione Horario Disponible", horarios_libres_opciones)
+        if horarios_libres_opciones
+        else None
+    )
+    if not horarios_libres_opciones:
+      st.warning(f"⚠️ No hay horarios disponibles para el día {dia_envio}.")
+
+    reservado_por = st.text_input(
+        "Nombre de Quien Reserva", key="reservado_por_input"
+    )
+    direccion_envio = st.text_input(
+        "Dirección de Destino / Entrega", key="direccion_input"
+    )
+
+    submitted = st.form_submit_button("Agendar Viajes y Guardar en Google Drive")
+
+    if submitted:
+      if peso_total_general == 0:
+        st.warning("Debe seleccionar al menos un material.")
+      elif not reservado_por.strip():
+        st.warning("Debe indicar el nombre de quien reserva.")
+      elif not direccion_envio.strip():
+        st.warning("Debe indicar la dirección de destino.")
+      elif not horario_seleccionado:
+        st.error("⚠️ Debe seleccionar un horario válido.")
+      else:
+        try:
+          matriz_datos = obtener_matriz_hoja()
+          columnas_dia = mapa_dias_bloques[dia_envio]
+          hora_base_elegida = horario_seleccionado.split(" (Disponibles:")[0]
+          idx_inicio = horarios_para_revisar.index(hora_base_elegida)
+
+          horarios_a_reservar = [
+              horarios_para_revisar[idx_inicio + i]
+              for i in range(viajes_estimados)
+          ]
+          espacios_totales_encontrados = []
+
+          for hora_b in horarios_a_reservar:
+            clave_f = obtener_clave_fila(hora_b, dia_envio)
+            fila_meta = mapa_filas[clave_f]
+            row_idx = fila_meta - 1
+            col_encontrada = None
+            for col_num in columnas_dia:
+              col_idx = col_num - 3
+              val = (
+                  matriz_datos[row_idx][col_idx]
+                  if matriz_datos and len(matriz_datos) > row_idx
+                  else ""
+              )
+              if not es_reserva_real(val):
+                col_encontrada = col_num
+                break
+            if col_encontrada:
+              espacios_totales_encontrados.append(
+                  (col_encontrada, fila_meta, hora_b)
+              )
+
+          if len(espacios_totales_encontrados) < viajes_estimados:
+            st.error(
+                "⚠️ Algunos de los horarios consecutivos seleccionados ya"
+                " fueron ocupados."
+            )
+          else:
+            color_rgb = COLORES_MOTORISTAS.get(
+                motorista_seleccionado, {"red": 1.0, "green": 1.0, "blue": 1.0}
+            )
+            for col_num, fila_meta, hora_b in espacios_totales_encontrados:
+              letra_col = num_a_letra(col_num)
+              celda_destino = f"{letra_col}{fila_meta}"
+              texto_reserva = (
+                  f"{motorista_seleccionado} ({reservado_por}) - Ocupado"
+              )
+              actualizar_celda_hoja(celda_destino, texto_reserva, color_rgb)
+
+            fecha_str = fecha_registro.strftime("%Y-%m-%d")
+            fila_guardada = agregar_fila_hoja([
+                motorista_seleccionado,
+                f"{viajes_estimados} Viajes",
+                reservado_por,
+                f"{peso_total_quintales:,.2f} qq ({peso_total_general:,.2f}"
+                " lbs)",
+                fecha_str,
+                direccion_envio,
+            ])
+
+            st.session_state.form_reset = True
+            st.success(
+                f"¡Se han agendado con éxito los {viajes_estimados} viajes en"
+                f" Google Drive (Fila {fila_guardada})!"
+            )
+            st.rerun()
+        except Exception as e:
+          st.error(f"Error al escribir en Google Drive: {e}")
+
+  st.markdown("---")
+  st.subheader("👀 Cuadro de Disponibilidad en Google Drive")
+
+  try:
+    matriz_datos = obtener_matriz_hoja()
+    datos_calendario = []
+    for hora_etiqueta in HORARIOS_ESTRELLA:
+      fila_actual = {"HORA": hora_etiqueta}
+      for dia, cols in mapa_dias_bloques.items():
+        clave_f = obtener_clave_fila(hora_etiqueta, dia)
+        r_num = mapa_filas[clave_f]
+        r_idx = r_num - 1
+        ocupaciones, libres_count = [], 0
+        for c_num in cols:
+          c_idx = c_num - 3
+          val = (
+              matriz_datos[r_idx][c_idx]
+              if matriz_datos and len(matriz_datos) > r_idx
+              else ""
+          )
+          if dia == "SÁBADO" and hora_etiqueta in [
+              "2:30 p.m. (⭐ Viaje 3)",
+              "4:30 p.m. (⭐ Viaje 4)",
+          ]:
+            fila_actual[dia] = "🚫 No laborable"
+            continue
+          if not es_reserva_real(val):
+            libres_count += 1
+          else:
+            ocupaciones.append(str(val).split(" - ")[0])
+
+        if dia != "SÁBADO" or hora_etiqueta not in [
             "2:30 p.m. (⭐ Viaje 3)",
             "4:30 p.m. (⭐ Viaje 4)",
         ]:
-          fila_actual[dia] = "🚫 No laborable"
-          continue
-        if not es_reserva_real(val):
-          libres_count += 1
-        else:
-          ocupaciones.append(str(val).split(" - ")[0])
+          if libres_count == len(cols):
+            fila_actual[dia] = "🟢 Todo Libre (5)"
+          elif libres_count == 0:
+            fila_actual[dia] = f"🔴 Ocupado ({', '.join(ocupaciones)})"
+          else:
+            fila_actual[dia] = (
+                f"🟡 {libres_count} Libres | Ocup: {', '.join(ocupaciones)}"
+            )
+      datos_calendario.append(fila_actual)
 
-      if dia != "SÁBADO" or hora_etiqueta not in [
-          "2:30 p.m. (⭐ Viaje 3)",
-          "4:30 p.m. (⭐ Viaje 4)",
-      ]:
-        if libres_count == len(cols):
-          fila_actual[dia] = "🟢 Todo Libre (5)"
-        elif libres_count == 0:
-          fila_actual[dia] = f"🔴 Ocupado ({', '.join(ocupaciones)})"
-        else:
-          fila_actual[dia] = (
-              f"🟡 {libres_count} Libres | Ocup: {', '.join(ocupaciones)}"
-          )
-    datos_calendario.append(fila_actual)
+    st.dataframe(
+        pd.DataFrame(datos_calendario), hide_index=True, use_container_width=True
+    )
+  except Exception as e:
+    st.warning(f"No se pudo cargar el cuadro desde Google Drive: {e}")
 
-  st.dataframe(
-      pd.DataFrame(datos_calendario), hide_index=True, use_container_width=True
+elif menu_opcion == "📦 Consulta de Materiales":
+  st.subheader("📦 Lista Actual de Materiales y Pesos (Google Drive)")
+  st.write(
+      "Aquí puedes verificar los materiales sincronizados que alimentan el"
+      " sistema de cálculo de peso."
   )
-except Exception as e:
-  st.warning(f"No se pudo cargar el cuadro desde Google Drive: {e}")
+  st.dataframe(df_materiales_base, use_container_width=True)
+
+elif menu_opcion == "📊 Reportes Mensuales":
+  st.subheader("📊 Historial y Reportes Mensuales")
+  st.info(
+      "💡 Los envíos registrados se archivan automáticamente en pestañas"
+      " mensuales (ej. 'Octubre 2026') dentro de tu archivo de Google Drive."
+  )
+  st.write(
+      "Para consultar el consolidado detallado, puedes abrir directamente tu"
+      " Google Sheet y revisar la pestaña correspondiente al mes que deseas"
+      " auditar."
+  )
