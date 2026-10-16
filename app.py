@@ -12,6 +12,9 @@ st.set_page_config(
     layout="wide",
 )
 
+# URL de tu Apps Script configurada
+WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyTrK1m9Rs1zSpUp1BRKn5WmSV-ixTrZ-R_yAng-xEGR_6NWYaz1T1W7uSjms5314U3/exec"
+
 # --- MENÚ LATERAL (OPCIÓN B) ---
 st.sidebar.markdown(
     "<h2 style='text-align: center; color: #1f4e78;'>EL INDIO ®</h2>",
@@ -25,6 +28,41 @@ menu_opcion = st.sidebar.radio(
         "📦 Consulta de Materiales",
         "📊 Reportes Mensuales",
     ],
+)
+
+# --- SELECTOR DE SEMANA EN LA BARRA LATERAL ---
+st.sidebar.markdown("---")
+st.sidebar.markdown("### 📅 Control de Semana")
+
+# Fechas base para calcular las semanas del mes actual (ej. Octubre 2026)
+hoy = datetime.now()
+mes_actual_nombre = [
+    "Enero",
+    "Febrero",
+    "Marzo",
+    "Abril",
+    "Mayo",
+    "Junio",
+    "Julio",
+    "Agosto",
+    "Septiembre",
+    "Octubre",
+    "Noviembre",
+    "Diciembre",
+][hoy.month - 1]
+
+opciones_semanas = [
+    "Hoja1",
+    f"{mes_actual_nombre} - Semana 1",
+    f"{mes_actual_nombre} - Semana 2",
+    f"{mes_actual_nombre} - Semana 3",
+    f"{mes_actual_nombre} - Semana 4",
+]
+
+semana_seleccionada = st.sidebar.selectbox(
+    "Seleccionar Pestaña / Semana",
+    opciones_semanas,
+    help="Elige qué semana deseas visualizar en el cuadro de disponibilidad.",
 )
 
 # --- LOGO CENTRADO Y EN TAMAÑO IDEAL ---
@@ -43,18 +81,17 @@ st.markdown(
     unsafe_allow_html=True,
 )
 st.markdown(
-    "<p style='text-align: center; color: gray;'>Sincronización dinámica en"
-    " vivo con Google Drive.</p>",
+    f"<p style='text-align: center; color: gray;'>Sincronización activa —"
+    f" Visualizando: <b>{semana_seleccionada}</b></p>",
     unsafe_allow_html=True,
 )
 
-# URL de tu Apps Script configurada
-WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyTrK1m9Rs1zSpUp1BRKn5WmSV-ixTrZ-R_yAng-xEGR_6NWYaz1T1W7uSjms5314U3/exec"
 
-
-def obtener_matriz_hoja():
+def obtener_matriz_hoja(nombre_hoja="Hoja1"):
   try:
-    response = requests.get(f"{WEB_APP_URL}?action=getData", timeout=10)
+    response = requests.get(
+        f"{WEB_APP_URL}?action=getData&sheet={nombre_hoja}", timeout=10
+    )
     if response.status_code == 200:
       return response.json()
   except Exception:
@@ -225,7 +262,6 @@ def es_reserva_real(val):
 # --- CONTENIDO SEGÚN MENÚ SELECCIONADO ---
 if menu_opcion == "🚛 Logística y Reservas":
 
-  # --- ESTADOS DE SESIÓN ---
   if "form_reset" not in st.session_state:
     st.session_state.form_reset = False
 
@@ -254,7 +290,6 @@ if menu_opcion == "🚛 Logística y Reservas":
       "SÁBADO": 5,
   }
 
-  hoy = datetime.now()
   lunes_actual = hoy - timedelta(days=hoy.weekday())
 
   if "fecha_seleccionada" not in st.session_state:
@@ -286,7 +321,6 @@ if menu_opcion == "🚛 Logística y Reservas":
       st.session_state.widget_dia_envio = "LUNES"
 
 
-  # --- INTERFAZ DE LOGÍSTICA ---
   col1, col2 = st.columns(2)
 
   with col1:
@@ -377,7 +411,7 @@ if menu_opcion == "🚛 Logística y Reservas":
       )
 
   st.markdown("---")
-  st.subheader("📅 Reserva de Espacio en el Calendario y Registro en Hoja 1")
+  st.subheader("📅 Reserva de Espacio en el Calendario")
 
   f_col1, f_col2 = st.columns(2)
   with f_col1:
@@ -394,7 +428,7 @@ if menu_opcion == "🚛 Logística y Reservas":
         on_change=actualizar_fecha_por_dia,
     )
 
-  matriz_temp = obtener_matriz_hoja()
+  matriz_temp = obtener_matriz_hoja(semana_seleccionada)
 
   with st.form("form_envio"):
     horarios_libres_opciones = []
@@ -456,7 +490,7 @@ if menu_opcion == "🚛 Logística y Reservas":
         st.error("⚠️ Debe seleccionar un horario válido.")
       else:
         try:
-          matriz_datos = obtener_matriz_hoja()
+          matriz_datos = obtener_matriz_hoja(semana_seleccionada)
           columnas_dia = mapa_dias_bloques[dia_envio]
           hora_base_elegida = horario_seleccionado.split(" (Disponibles:")[0]
           idx_inicio = horarios_para_revisar.index(hora_base_elegida)
@@ -518,17 +552,19 @@ if menu_opcion == "🚛 Logística y Reservas":
             st.session_state.form_reset = True
             st.success(
                 f"¡Se han agendado con éxito los {viajes_estimados} viajes en"
-                f" Google Drive (Fila {fila_guardada})!"
+                f" Google Drive ({semana_seleccion_nombre if 'semana_seleccion_nombre' in locals() else semana_seleccionada})!"
             )
             st.rerun()
         except Exception as e:
           st.error(f"Error al escribir en Google Drive: {e}")
 
   st.markdown("---")
-  st.subheader("👀 Cuadro de Disponibilidad en Google Drive")
+  st.subheader(
+      f"👀 Cuadro de Disponibilidad en Google Drive ({semana_seleccionada})"
+  )
 
   try:
-    matriz_datos = obtener_matriz_hoja()
+    matriz_datos = obtener_matriz_hoja(semana_seleccionada)
     datos_calendario = []
     for hora_etiqueta in HORARIOS_ESTRELLA:
       fila_actual = {"HORA": hora_etiqueta}
@@ -587,10 +623,9 @@ elif menu_opcion == "📊 Reportes Mensuales":
   st.subheader("📊 Historial y Reportes Mensuales")
   st.info(
       "💡 Los envíos registrados se archivan automáticamente en pestañas"
-      " mensuales (ej. 'Octubre 2026') dentro de tu archivo de Google Drive."
+      " semanales y mensuales dentro de tu archivo de Google Drive."
   )
   st.write(
-      "Para consultar el consolidado detallado, puedes abrir directamente tu"
-      " Google Sheet y revisar la pestaña correspondiente al mes que deseas"
-      " auditar."
+      "Puedes consultar el consolidado detallado abriendo directamente tu"
+      " Google Sheet y revisando las pestañas correspondientes."
   )
