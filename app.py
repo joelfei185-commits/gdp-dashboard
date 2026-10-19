@@ -30,38 +30,12 @@ menu_opcion = st.sidebar.radio(
     ],
 )
 
-# --- SELECTOR DE SEMANA EN LA BARRA LATERAL ---
+# --- CONTROL DE SEMANA AUTOMÁTICO POR FECHA ---
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 📅 Control de Semana")
-
-hoy = datetime.now()
-mes_actual_nombre = [
-    "Enero",
-    "Febrero",
-    "Marzo",
-    "Abril",
-    "Mayo",
-    "Junio",
-    "Julio",
-    "Agosto",
-    "Septiembre",
-    "Octubre",
-    "Noviembre",
-    "Diciembre",
-][hoy.month - 1]
-
-opciones_semanas = [
-    "Hoja1",
-    f"{mes_actual_nombre} - Semana 1",
-    f"{mes_actual_nombre} - Semana 2",
-    f"{mes_actual_nombre} - Semana 3",
-    f"{mes_actual_nombre} - Semana 4",
-]
-
-semana_seleccionada = st.sidebar.selectbox(
-    "Seleccionar Pestaña / Semana",
-    opciones_semanas,
-    help="Elige qué semana deseas visualizar en el cuadro de disponibilidad.",
+st.sidebar.info(
+    "💡 Las hojas semanales se generan y seleccionan **automáticamente** según"
+    " la fecha del viaje que elijas en el formulario."
 )
 
 # --- LOGO CENTRADO Y EN TAMAÑO IDEAL ---
@@ -80,10 +54,32 @@ st.markdown(
     unsafe_allow_html=True,
 )
 st.markdown(
-    f"<p style='text-align: center; color: gray;'>Sincronización activa —"
-    f" Visualizando: <b>{semana_seleccionada}</b></p>",
+    "<p style='text-align: center; color: gray;'>Sincronización activa —"
+    " Gestión automatizada por fecha</p>",
     unsafe_allow_html=True,
 )
+
+
+# Función auxiliar para calcular el nombre de la hoja según una fecha (para lectura de disponibilidad)
+def obtener_nombre_hoja_por_fecha(fecha_obj):
+  lunes = fecha_obj - timedelta(days=fecha_obj.weekday())
+  sabado = lunes + timedelta(days=5)
+  meses = [
+      "ENERO",
+      "FEBRERO",
+      "MARZO",
+      "ABRIL",
+      "MAYO",
+      "JUNIO",
+      "JULIO",
+      "AGOSTO",
+      "SEPTIEMBRE",
+      "OCTUBRE",
+      "NOVIEMBRE",
+      "DICIEMBRE",
+  ]
+  mes_nombre = meses[lunes.month - 1]
+  return f"SEMANA {lunes.day}-{sabado.day} {mes_nombre}"
 
 
 def obtener_matriz_hoja(nombre_hoja="Hoja1"):
@@ -265,6 +261,8 @@ def es_reserva_real(val):
 
 
 # --- CONTENIDO SEGÚN MENÚ SELECCIONADO ---
+hoy = datetime.now()
+
 if menu_opcion == "🚛 Logística y Reservas":
 
   if "form_reset" not in st.session_state:
@@ -433,7 +431,9 @@ if menu_opcion == "🚛 Logística y Reservas":
         on_change=actualizar_fecha_por_dia,
     )
 
-  matriz_temp = obtener_matriz_hoja(semana_seleccionada)
+  # Determinamos la hoja semanal automáticamente según la fecha seleccionada en el formulario
+  nombre_hoja_actual = obtener_nombre_hoja_por_fecha(fecha_registro)
+  matriz_temp = obtener_matriz_hoja(nombre_hoja_actual)
 
   with st.form("form_envio"):
     horarios_libres_opciones = []
@@ -495,7 +495,8 @@ if menu_opcion == "🚛 Logística y Reservas":
         st.error("⚠️ Debe seleccionar un horario válido.")
       else:
         try:
-          matriz_datos = obtener_matriz_hoja(semana_seleccionada)
+          # Recargamos la matriz de la hoja correspondiente por seguridad
+          matriz_datos = obtener_matriz_hoja(nombre_hoja_actual)
           columnas_dia = mapa_dias_bloques[dia_envio]
           hora_base_elegida = horario_seleccionado.split(" (Disponibles:")[0]
           idx_inicio = horarios_para_revisar.index(hora_base_elegida)
@@ -542,7 +543,7 @@ if menu_opcion == "🚛 Logística y Reservas":
                   f"{motorista_seleccionado} ({reservado_por}) - Ocupado"
               )
               actualizar_celda_hoja(
-                  celda_destino, texto_reserva, color_rgb, semana_seleccionada
+                  celda_destino, texto_reserva, color_rgb, nombre_hoja_actual
               )
 
             fecha_str = fecha_registro.strftime("%Y-%m-%d")
@@ -559,7 +560,7 @@ if menu_opcion == "🚛 Logística y Reservas":
             st.session_state.form_reset = True
             st.success(
                 f"¡Se han agendado con éxito los {viajes_estimados} viajes en"
-                f" Google Drive ({semana_seleccionada})!"
+                f" Google Drive ({nombre_hoja_actual})!"
             )
             st.rerun()
         except Exception as e:
@@ -567,11 +568,11 @@ if menu_opcion == "🚛 Logística y Reservas":
 
   st.markdown("---")
   st.subheader(
-      f"👀 Cuadro de Disponibilidad en Google Drive ({semana_seleccionada})"
+      f"👀 Cuadro de Disponibilidad en Google Drive ({nombre_hoja_actual})"
   )
 
   try:
-    matriz_datos = obtener_matriz_hoja(semana_seleccionada)
+    matriz_datos = obtener_matriz_hoja(nombre_hoja_actual)
     datos_calendario = []
     for hora_etiqueta in HORARIOS_ESTRELLA:
       fila_actual = {"HORA": hora_etiqueta}
