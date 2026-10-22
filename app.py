@@ -5,17 +5,45 @@ from PIL import Image
 import requests
 import streamlit as st
 
-# Configuración de la página
+# --- 1. CONFIGURACIÓN DE LA PÁGINA Y ESTILO VISUAL MODERNIZADO ---
 st.set_page_config(
-    page_title="Logística de Envío - Ferretería & Homecenter El Indio",
+    page_title="Logística de Envío - Ferretería El Indio",
     page_icon="🧰",
     layout="wide",
+)
+
+# Inyección de CSS para lograr el aspecto de "Dashboard Moderno" (Tarjetas, bordes y sombras)
+st.markdown(
+    """
+    <style>
+    /* Fondo general sutil */
+    .stApp {
+        background-color: #f4f6f9;
+    }
+    
+    /* Contenedores tipo tarjeta para métricas y secciones */
+    div.stMetric, div[data-testid="stVerticalBlock"] > div.element-container {
+        background-color: #ffffff;
+        border: 1px solid #e2e8f0;
+        padding: 15px;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.02);
+    }
+
+    /* Estilo limpio para la barra lateral */
+    section[data-testid="stSidebar"] {
+        background-color: #ffffff;
+        border-right: 1px solid #e2e8f0;
+    }
+    </style>
+""",
+    unsafe_allow_html=True,
 )
 
 # URL de tu Apps Script configurada
 WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyTrK1m9Rs1zSpUp1BRKn5WmSV-ixTrZ-R_yAng-xEGR_6NWYaz1T1W7uSjms5314U3/exec"
 
-# --- MENÚ LATERAL (OPCIÓN B) ---
+# --- 2. MENÚ LATERAL ESTILIZADO ---
 st.sidebar.markdown(
     "<h2 style='text-align: center; color: #1f4e78;'>EL INDIO ®</h2>",
     unsafe_allow_html=True,
@@ -30,37 +58,35 @@ menu_opcion = st.sidebar.radio(
     ],
 )
 
-# --- CONTROL DE SEMANA AUTOMÁTICO POR FECHA ---
+# Tarjeta informativa en la barra lateral (Control automático)
 st.sidebar.markdown("---")
-st.sidebar.markdown("### 📅 Control de Semana")
 st.sidebar.info(
-    "💡 Las hojas semanales se generan y seleccionan **automáticamente** según"
-    " la fecha del viaje que elijas en el formulario."
+    "📅 **Control Automático**\n\nLas hojas semanales se generan y seleccionan"
+    " **solas** según la fecha del viaje."
 )
 
-# --- LOGO CENTRADO Y EN TAMAÑO IDEAL ---
+# --- 3. ENCABEZADO PRINCIPAL ---
 try:
   logo_img = Image.open("logo.png")
   col_a, col_b, col_c = st.columns([2, 1, 2])
   with col_b:
-    st.image(logo_img, width=220)
+    st.image(logo_img, width=200)
 except Exception:
   pass
 
-# Título centrado corporativo
 st.markdown(
-    "<h1 style='text-align: center; margin-top: -10px;'>LOGÍSTICA DE ENVÍO"
-    " FERRETERÍA & HOMECENTER EL INDIO</h1>",
+    "<h1 style='text-align: center; color: #1f4e78; margin-top:"
+    " -10px;'>LOGÍSTICA DE ENVÍO</h1>",
     unsafe_allow_html=True,
 )
 st.markdown(
-    "<p style='text-align: center; color: gray;'>Sincronización activa —"
-    " Gestión automatizada por fecha</p>",
+    "<p style='text-align: center; color: #64748b;'>Panel de control operativo"
+    " y sincronización activa con Google Drive</p>",
     unsafe_allow_html=True,
 )
 
 
-# Función auxiliar para calcular el nombre de la hoja según una fecha (para lectura de disponibilidad)
+# --- 4. FUNCIONES DE CONEXIÓN Y DATOS ---
 def obtener_nombre_hoja_por_fecha(fecha_obj):
   lunes = fecha_obj - timedelta(days=fecha_obj.weekday())
   sabado = lunes + timedelta(days=5)
@@ -94,7 +120,6 @@ def obtener_matriz_hoja(nombre_hoja="Hoja1"):
   return []
 
 
-# Carga dinámica de materiales desde Google Drive
 @st.cache_data(ttl=30)
 def obtener_materiales_desde_drive():
   try:
@@ -175,13 +200,11 @@ def agregar_fila_hoja(row_data):
     return 30
 
 
-# FLOTA DE MOTORISTAS (Diego con 50 qq / Camión Pequeño)
+# Flota y mapeos
 df_motoristas = pd.DataFrame({
     "MOTORISTA": ["ELVIS", "LUIS PEREZ", "DIEGO", "ALVARO", "TOMAS"],
     "CAPACIDAD (QUINTALES)": [100, 100, 50, 100, 100],
 })
-
-st.success("¡Conectado y sincronizado con Google Drive exitosamente!")
 
 COLORES_MOTORISTAS = {
     "ELVIS": {"red": 1.0, "green": 0.92, "blue": 0.23},
@@ -240,9 +263,7 @@ def es_reserva_real(val):
   val_str = str(val).strip()
   if val_str.lower() in ["none", "nan", ""]:
     return False
-
   val_upper = val_str.upper()
-
   if any(
       h in val_upper
       for h in ["8:00 A.M.", "10:00 A.M.", "2:30 P.M.", "4:30 P.M.", "ALMUERZO"]
@@ -252,15 +273,13 @@ def es_reserva_real(val):
         for mot in ["ELVIS", "LUIS PEREZ", "DIEGO", "ALVARO", "TOMAS"]
     ):
       return False
-
   for mot in ["ELVIS", "LUIS PEREZ", "DIEGO", "ALVARO", "TOMAS", "OCUPADO"]:
     if mot in val_upper:
       return True
-
   return False
 
 
-# --- CONTENIDO SEGÚN MENÚ SELECCIONADO ---
+# --- 5. CUERPO DE LA APLICACIÓN SEGÚN MENÚ ---
 hoy = datetime.now()
 
 if menu_opcion == "🚛 Logística y Reservas":
@@ -327,7 +346,7 @@ if menu_opcion == "🚛 Logística y Reservas":
   col1, col2 = st.columns(2)
 
   with col1:
-    st.subheader("📦 Ingreso de Materiales (Pedido Principal)")
+    st.markdown("### 📦 Ingreso de Materiales")
     cantidades_p1 = []
     for index, row in df_materiales_base.iterrows():
       mat_nombre = str(row["MATERIAL"])
@@ -336,7 +355,7 @@ if menu_opcion == "🚛 Logística y Reservas":
       if key_p1 not in st.session_state:
         st.session_state[key_p1] = 0.0
       cant = st.number_input(
-          f"{mat_nombre} (P. unidad: {mat_lbs:.2f} lbs)",
+          f"{mat_nombre} (Unidad: {mat_lbs:.2f} lbs)",
           min_value=0.0,
           step=1.0,
           key=key_p1,
@@ -348,7 +367,7 @@ if menu_opcion == "🚛 Logística y Reservas":
     df_p1["TOTAL QT"] = df_p1["CANTIDAD"] * df_p1["LBS"]
 
   with col2:
-    st.subheader("🚛 Resumen y Estado de Carga")
+    st.markdown("### 🚛 Resumen y Estado de Carga")
     motorista_seleccionado = st.selectbox(
         "Seleccione Motorista", df_motoristas["MOTORISTA"]
     )
@@ -366,9 +385,7 @@ if menu_opcion == "🚛 Logística y Reservas":
 
     cantidades_p2 = [0.0] * len(df_materiales_base)
     if peso_principal > 0 and capacidad_en_libras > 0:
-      with st.expander(
-          "➕ Añadir Materiales Extra / Rellenar Viaje Incompleto"
-      ):
+      with st.expander("➕ Añadir Materiales Extra / Rellenar Viaje"):
         viajes_disponibles_opciones = [
             f"Viaje {i+1}" for i in range(viajes_estimados)
         ]
@@ -402,19 +419,21 @@ if menu_opcion == "🚛 Logística y Reservas":
     peso_total_general = df_total_general["TOTAL QT"].sum()
     peso_total_quintales = peso_total_general / 100
 
+    # Tarjeta tipo KPI Moderno para el peso total
     st.metric(
-        label="Peso Total de Carga (Principal + Extras)",
-        value=f"{peso_total_quintales:,.2f} qq ({peso_total_general:,.2f} lbs)",
+        label="Peso Total Acumulado",
+        value=f"{peso_total_quintales:,.2f} qq",
+        delta=f"{peso_total_general:,.2f} lbs",
     )
 
     if peso_total_general > 0:
       st.info(
           f"🚚 **{motorista_seleccionado}** (Capacidad: {capacidad_quintales}"
-          f" qq) hará este envío en **{viajes_estimados} Viaje(s)**."
+          f" qq) realizará la entrega en **{viajes_estimados} Viaje(s)**."
       )
 
   st.markdown("---")
-  st.subheader("📅 Reserva de Espacio en el Calendario")
+  st.markdown("### 📅 Reserva de Espacio en el Calendario")
 
   f_col1, f_col2 = st.columns(2)
   with f_col1:
@@ -431,7 +450,6 @@ if menu_opcion == "🚛 Logística y Reservas":
         on_change=actualizar_fecha_por_dia,
     )
 
-  # Determinamos la hoja semanal automáticamente según la fecha seleccionada en el formulario
   nombre_hoja_actual = obtener_nombre_hoja_por_fecha(fecha_registro)
   matriz_temp = obtener_matriz_hoja(nombre_hoja_actual)
 
@@ -482,7 +500,7 @@ if menu_opcion == "🚛 Logística y Reservas":
         "Dirección de Destino / Entrega", key="direccion_input"
     )
 
-    submitted = st.form_submit_button("Agendar Viajes y Guardar en Google Drive")
+    submitted = st.form_submit_button("🚀 Agendar Viajes y Guardar en el Sistema")
 
     if submitted:
       if peso_total_general == 0:
@@ -495,7 +513,6 @@ if menu_opcion == "🚛 Logística y Reservas":
         st.error("⚠️ Debe seleccionar un horario válido.")
       else:
         try:
-          # Recargamos la matriz de la hoja correspondiente por seguridad
           matriz_datos = obtener_matriz_hoja(nombre_hoja_actual)
           columnas_dia = mapa_dias_bloques[dia_envio]
           hora_base_elegida = horario_seleccionado.split(" (Disponibles:")[0]
@@ -559,16 +576,16 @@ if menu_opcion == "🚛 Logística y Reservas":
 
             st.session_state.form_reset = True
             st.success(
-                f"¡Se han agendado con éxito los {viajes_estimados} viajes en"
-                f" Google Drive ({nombre_hoja_actual})!"
+                f"¡Se han agendado con éxito los {viajes_estimados} viajes en la"
+                f" hoja: {nombre_hoja_actual}!"
             )
             st.rerun()
         except Exception as e:
           st.error(f"Error al escribir en Google Drive: {e}")
 
   st.markdown("---")
-  st.subheader(
-      f"👀 Cuadro de Disponibilidad en Google Drive ({nombre_hoja_actual})"
+  st.markdown(
+      f"### 📊 Cuadro de Disponibilidad Actual ({nombre_hoja_actual})"
   )
 
   try:
@@ -620,20 +637,20 @@ if menu_opcion == "🚛 Logística y Reservas":
     st.warning(f"No se pudo cargar el cuadro desde Google Drive: {e}")
 
 elif menu_opcion == "📦 Consulta de Materiales":
-  st.subheader("📦 Lista Actual de Materiales y Pesos (Google Drive)")
+  st.markdown("### 📦 Lista Actual de Materiales y Pesos")
   st.write(
-      "Aquí puedes verificar los materiales sincronizados que alimentan el"
-      " sistema de cálculo de peso."
+      "Verifica los materiales sincronizados que alimentan el cálculo automático"
+      " de peso."
   )
   st.dataframe(df_materiales_base, use_container_width=True)
 
 elif menu_opcion == "📊 Reportes Mensuales":
-  st.subheader("📊 Historial y Reportes Mensuales")
+  st.markdown("### 📊 Historial y Reportes Mensuales")
   st.info(
-      "💡 Los envíos registrados se archivan automáticamente en pestañas"
-      " semanales y mensuales dentro de tu archivo de Google Drive."
+      "💡 Los envíos registrados se archivan automáticamente en las pestañas"
+      " semanales y mensuales de Google Drive."
   )
   st.write(
-      "Puedes consultar el consolidado detallado abriendo directamente tu"
-      " Google Sheet y revisando las pestañas correspondientes."
+      "Puedes consultar el consolidado detallado ingresando directamente a tu"
+      " Google Sheet."
   )
