@@ -12,7 +12,6 @@ st.set_page_config(
     layout="wide",
 )
 
-# Estilo CSS limpio para evitar exceso de recuadros en los campos de texto
 st.markdown(
     """
     <style>
@@ -58,7 +57,6 @@ menu_opcion = st.sidebar.radio(
     ],
 )
 
-# Tarjeta informativa en la barra lateral
 st.sidebar.markdown("---")
 st.sidebar.info(
     "📅 **Control Automático**\n\nLas hojas semanales se generan y seleccionan"
@@ -192,16 +190,19 @@ def actualizar_celda_hoja(celda, texto, color, nombre_hoja="Hoja1"):
 
 def agregar_fila_hoja(row_data, nombre_hoja="Hoja1"):
   try:
-    payload = {
-        "action": "appendRow",
-        "row": row_data,
-        "sheet": nombre_hoja,  # <--- Enviamos la hoja correcta
-    }
+    payload = {"action": "appendRow", "row": row_data, "sheet": nombre_hoja}
     res = requests.post(WEB_APP_URL, json=payload, timeout=10)
     return res.json().get("row", 30)
   except Exception as e:
     st.error(f"Error al guardar registro: {e}")
     return 30
+
+
+# Flota de motoristas y mapa de colores
+df_motoristas = pd.DataFrame({
+    "MOTORISTA": ["ELVIS", "LUIS PEREZ", "DIEGO", "ALVARO", "TOMAS"],
+    "CAPACIDAD (QUINTALES)": [100, 100, 50, 100, 100],
+})
 
 COLORES_MOTORISTAS = {
     "ELVIS": {"red": 1.0, "green": 0.92, "blue": 0.23},
@@ -560,15 +561,18 @@ if menu_opcion == "🚛 Logística y Reservas":
               )
 
             fecha_str = fecha_registro.strftime("%Y-%m-%d")
-            fila_guardada = agregar_fila_hoja([
-                motorista_seleccionado,
-                f"{viajes_estimados} Viajes",
-                reservado_por,
-                f"{peso_total_quintales:,.2f} qq ({peso_total_general:,.2f}"
-                " lbs)",
-                fecha_str,
-                direccion_envio,
-            ])
+            # AQUÍ SE ENVÍA EXPLÍCITAMENTE EL NOMBRE DE LA HOJA CALCULADA
+            fila_guardada = agregar_fila_hoja(
+                [
+                    motorista_seleccionado,
+                    f"{viajes_estimados} Viajes",
+                    reservado_por,
+                    f"{peso_total_quintales:,.2f} qq ({peso_total_general:,.2f} lbs)",
+                    fecha_str,
+                    direccion_envio,
+                ],
+                nombre_hoja_actual,
+            )
 
             st.session_state.form_reset = True
             st.success(
