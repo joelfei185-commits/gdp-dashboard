@@ -5,35 +5,35 @@ from PIL import Image
 import requests
 import streamlit as st
 
-# --- 1. CONFIGURACIÓN DE LA PÁGINA Y ESTILO VISUAL MODERNIZADO ---
+# --- 1. CONFIGURACIÓN DE LA PÁGINA Y ESTILO VISUAL REFINADO ---
 st.set_page_config(
     page_title="Logística de Envío - Ferretería El Indio",
     page_icon="🧰",
     layout="wide",
 )
 
-# Inyección de CSS para lograr el aspecto de "Dashboard Moderno" (Tarjetas, bordes y sombras)
+# Estilo CSS limpio para evitar exceso de recuadros en los campos de texto
 st.markdown(
     """
     <style>
-    /* Fondo general sutil */
+    /* Fondo general sutil y moderno */
     .stApp {
         background-color: #f4f6f9;
     }
     
-    /* Contenedores tipo tarjeta para métricas y secciones */
-    div.stMetric, div[data-testid="stVerticalBlock"] > div.element-container {
+    /* Estilo limpio para la barra lateral */
+    section[data-testid="stSidebar"] {
+        background-color: #ffffff;
+        border-right: 1px solid #e2e8f0;
+    }
+
+    /* Estilo tipo tarjeta exclusivamente para las tarjetas de métricas / KPI */
+    div.stMetric {
         background-color: #ffffff;
         border: 1px solid #e2e8f0;
         padding: 15px;
         border-radius: 12px;
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.02);
-    }
-
-    /* Estilo limpio para la barra lateral */
-    section[data-testid="stSidebar"] {
-        background-color: #ffffff;
-        border-right: 1px solid #e2e8f0;
     }
     </style>
 """,
@@ -58,7 +58,7 @@ menu_opcion = st.sidebar.radio(
     ],
 )
 
-# Tarjeta informativa en la barra lateral (Control automático)
+# Tarjeta informativa en la barra lateral
 st.sidebar.markdown("---")
 st.sidebar.info(
     "📅 **Control Automático**\n\nLas hojas semanales se generan y seleccionan"
@@ -200,7 +200,7 @@ def agregar_fila_hoja(row_data):
     return 30
 
 
-# Flota y mapeos
+# Flota de motoristas y mapa de colores
 df_motoristas = pd.DataFrame({
     "MOTORISTA": ["ELVIS", "LUIS PEREZ", "DIEGO", "ALVARO", "TOMAS"],
     "CAPACIDAD (QUINTALES)": [100, 100, 50, 100, 100],
@@ -279,7 +279,7 @@ def es_reserva_real(val):
   return False
 
 
-# --- 5. CUERPO DE LA APLICACIÓN SEGÚN MENÚ ---
+# --- 5. LÓGICA DE INTERFAZ ---
 hoy = datetime.now()
 
 if menu_opcion == "🚛 Logística y Reservas":
@@ -419,7 +419,6 @@ if menu_opcion == "🚛 Logística y Reservas":
     peso_total_general = df_total_general["TOTAL QT"].sum()
     peso_total_quintales = peso_total_general / 100
 
-    # Tarjeta tipo KPI Moderno para el peso total
     st.metric(
         label="Peso Total Acumulado",
         value=f"{peso_total_quintales:,.2f} qq",
