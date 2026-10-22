@@ -190,21 +190,18 @@ def actualizar_celda_hoja(celda, texto, color, nombre_hoja="Hoja1"):
     st.error(f"Error al actualizar celda: {e}")
 
 
-def agregar_fila_hoja(row_data):
+def agregar_fila_hoja(row_data, nombre_hoja="Hoja1"):
   try:
-    payload = {"action": "appendRow", "row": row_data}
+    payload = {
+        "action": "appendRow",
+        "row": row_data,
+        "sheet": nombre_hoja,  # <--- Enviamos la hoja correcta
+    }
     res = requests.post(WEB_APP_URL, json=payload, timeout=10)
     return res.json().get("row", 30)
   except Exception as e:
     st.error(f"Error al guardar registro: {e}")
     return 30
-
-
-# Flota de motoristas y mapa de colores
-df_motoristas = pd.DataFrame({
-    "MOTORISTA": ["ELVIS", "LUIS PEREZ", "DIEGO", "ALVARO", "TOMAS"],
-    "CAPACIDAD (QUINTALES)": [100, 100, 50, 100, 100],
-})
 
 COLORES_MOTORISTAS = {
     "ELVIS": {"red": 1.0, "green": 0.92, "blue": 0.23},
