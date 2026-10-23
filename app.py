@@ -210,9 +210,12 @@ def num_a_letra(num):
 def es_reserva_real(val):
     if not val: return False
     val_str = str(val).strip()
-    if val_str.lower() in ["none", "nan", ""]: return False
+    if val_str.lower() in ["none", "nan", "", "libre"]: return False
     val_upper = val_str.upper()
-    return any(mot in val_upper for mot in ["ELVIS", "LUIS PEREZ", "DIEGO", "ALVARO", "TOMAS", "OCUPADO"])
+    motoristas_validos = ["ELVIS", "LUIS PEREZ", "DIEGO", "ALVARO", "TOMAS"]
+    if any(mot in val_upper for mot in motoristas_validos) or "OCUPADO" in val_upper:
+        return True
+    return False
 
 hoy = datetime.now()
 
