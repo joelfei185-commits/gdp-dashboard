@@ -7,7 +7,7 @@ from PIL import Image
 
 # --- 1. CONFIGURACIÓN DE LA PÁGINA Y ESTILO VISUAL ---
 st.set_page_config(
-    page_title="Registro de Pedidos - Ferretería El Indio",
+    page_title="Registro y Control - Ferretería El Indio",
     page_icon="🚛",
     layout="wide",
 )
@@ -28,6 +28,44 @@ st.markdown("""
         border-radius: 12px;
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.02);
     }
+    .main-header {
+        background-color: #1f4e78;
+        color: white;
+        padding: 12px;
+        border-radius: 6px;
+        text-align: center;
+        font-weight: bold;
+        font-size: 20px;
+        margin-bottom: 15px;
+    }
+    .metric-box {
+        background-color: #ffffff;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        padding: 12px;
+        text-align: center;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    }
+    .time-slot {
+        background-color: #e2e8f0;
+        padding: 6px;
+        font-weight: bold;
+        color: #1e293b;
+        border-radius: 4px;
+        margin-top: 10px;
+        margin-bottom: 5px;
+        text-align: center;
+    }
+    .status-free {
+        background-color: #dcfce7;
+        color: #166534;
+        padding: 6px;
+        border-radius: 4px;
+        text-align: center;
+        font-weight: bold;
+        border: 1px solid #86efac;
+        margin-bottom: 4px;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -37,10 +75,14 @@ WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyTrK1m9Rs1zSpUp1BRKn5WmS
 # --- 2. BARRA LATERAL ---
 st.sidebar.markdown("<h2 style='text-align: center; color: #1f4e78;'>EL INDIO ®</h2>", unsafe_allow_html=True)
 st.sidebar.markdown("---")
-st.sidebar.markdown("### 🚛 Módulo de Registro")
+
+# Menú para alternar vistas en la misma app
+modo_vista = st.sidebar.radio("Seleccione Módulo:", ["📝 Módulo de Registro", "📊 Dashboard de Disponibilidad"])
+
+st.sidebar.markdown("---")
 st.sidebar.info("📅 **Sistema Automatizado**\n\nLos pedidos se enrutan de forma inteligente a su hoja semanal correspondiente.")
 
-# --- 3. ENCABEZADO ---
+# --- 3. ENCABEZADO PRINCIPAL ---
 try:
     logo_img = Image.open("logo.png")
     col_a, col_b, col_c = st.columns([2, 1, 2])
@@ -157,7 +199,6 @@ def es_reserva_real(val):
             return False
     return any(mot in val_upper for mot in ["ELVIS", "LUIS PEREZ", "DIEGO", "ALVARO", "TOMAS", "OCUPADO"])
 
-# --- 5. LÓGICA DE FORMULARIO Y REGISTRO ---
 hoy = datetime.now()
 
 if "form_reset" not in st.session_state:
@@ -187,140 +228,229 @@ def actualizar_dia_por_fecha():
     num_dia_semana = nueva_fecha.weekday()
     st.session_state.widget_dia_envio = dias_semana_map.get(num_dia_semana, "LUNES") if num_dia_semana <= 5 else "LUNES"
 
-col1, col2 = st.columns(2)
 
-with col1:
-    st.markdown("### 📦 Ingreso de Materiales")
-    cantidades_p1 = []
-    for index, row in df_materiales_base.iterrows():
-        key_p1 = f"p1_{index}"
-        if key_p1 not in st.session_state: st.session_state[key_p1] = 0.0
-        cant = st.number_input(f"{row['MATERIAL']} ({row['LBS']:.2f} lbs)", min_value=0.0, step=1.0, key=key_p1)
-        cantidades_p1.append(cant)
-    
-    df_p1 = df_materiales_base.copy()
-    df_p1["CANTIDAD"] = cantidades_p1
-    df_p1["TOTAL QT"] = df_p1["CANTIDAD"] * df_p1["LBS"]
+# ==========================================
+# VISTA 1: MÓDULO DE REGISTRO
+# ==========================================
+if modo_vista == "📝 Módulo de Registro":
+    col1, col2 = st.columns(2)
 
-with col2:
-    st.markdown("### 🚛 Resumen y Estado de Carga")
-    motorista_seleccionado = st.selectbox("Seleccione Motorista", df_motoristas["MOTORISTA"])
-    capacidad_quintales = float(df_motoristas[df_motoristas["MOTORISTA"] == motorista_seleccionado]["CAPACIDAD (QUINTALES)"].values[0])
-    capacidad_en_libras = capacidad_quintales * 100
+    with col1:
+        st.markdown("### 📦 Ingreso de Materiales")
+        cantidades_p1 = []
+        for index, row in df_materiales_base.iterrows():
+            key_p1 = f"p1_{index}"
+            if key_p1 not in st.session_state: st.session_state[key_p1] = 0.0
+            cant = st.number_input(f"{row['MATERIAL']} ({row['LBS']:.2f} lbs)", min_value=0.0, step=1.0, key=key_p1)
+            cantidades_p1.append(cant)
+        
+        df_p1 = df_materiales_base.copy()
+        df_p1["CANTIDAD"] = cantidades_p1
+        df_p1["TOTAL QT"] = df_p1["CANTIDAD"] * df_p1["LBS"]
 
-    peso_principal = df_p1["TOTAL QT"].sum()
-    viajes_estimados = max(1, math.ceil(peso_principal / capacidad_en_libras)) if capacidad_en_libras > 0 and peso_principal > 0 else 1
+    with col2:
+        st.markdown("### 🚛 Resumen y Estado de Carga")
+        motorista_seleccionado = st.selectbox("Seleccione Motorista", df_motoristas["MOTORISTA"])
+        capacidad_quintales = float(df_motoristas[df_motoristas["MOTORISTA"] == motorista_seleccionado]["CAPACIDAD (QUINTALES)"].values[0])
+        capacidad_en_libras = capacidad_quintales * 100
 
-    cantidades_p2 = [0.0] * len(df_materiales_base)
-    if peso_principal > 0 and capacidad_en_libras > 0:
-        with st.expander("➕ Añadir Materiales Extra / Rellenar Viaje"):
-            st.selectbox("Elegir Viaje a Completar", [f"Viaje {i+1}" for i in range(viajes_estimados)])
-            cantidades_p2 = []
-            for index, row in df_materiales_base.iterrows():
-                key_p2 = f"p2_{index}"
-                if key_p2 not in st.session_state: st.session_state[key_p2] = 0.0
-                cant_comp = st.number_input(f"Extra: {row['MATERIAL']}", min_value=0.0, step=1.0, key=key_p2)
-                cantidades_p2.append(cant_comp)
+        peso_principal = df_p1["TOTAL QT"].sum()
+        viajes_estimados = max(1, math.ceil(peso_principal / capacidad_en_libras)) if capacidad_en_libras > 0 and peso_principal > 0 else 1
 
-    df_p2 = df_materiales_base.copy()
-    df_p2["CANTIDAD"] = cantidades_p2
-    df_p2["TOTAL QT"] = df_p2["CANTIDAD"] * df_p2["LBS"]
+        cantidades_p2 = [0.0] * len(df_materiales_base)
+        if peso_principal > 0 and capacidad_en_libras > 0:
+            with st.expander("➕ Añadir Materiales Extra / Rellenar Viaje"):
+                st.selectbox("Elegir Viaje a Completar", [f"Viaje {i+1}" for i in range(viajes_estimados)])
+                cantidades_p2 = []
+                for index, row in df_materiales_base.iterrows():
+                    key_p2 = f"p2_{index}"
+                    if key_p2 not in st.session_state: st.session_state[key_p2] = 0.0
+                    cant_comp = st.number_input(f"Extra: {row['MATERIAL']}", min_value=0.0, step=1.0, key=key_p2)
+                    cantidades_p2.append(cant_comp)
 
-    df_total_general = df_p1.copy()
-    df_total_general["CANTIDAD"] = df_p1["CANTIDAD"] + df_p2["CANTIDAD"]
-    df_total_general["TOTAL QT"] = df_total_general["CANTIDAD"] * df_total_general["LBS"]
+        df_p2 = df_materiales_base.copy()
+        df_p2["CANTIDAD"] = cantidades_p2
+        df_p2["TOTAL QT"] = df_p2["CANTIDAD"] * df_p2["LBS"]
 
-    peso_total_general = df_total_general["TOTAL QT"].sum()
-    peso_total_quintales = peso_total_general / 100
+        df_total_general = df_p1.copy()
+        df_total_general["CANTIDAD"] = df_p1["CANTIDAD"] + df_p2["CANTIDAD"]
+        df_total_general["TOTAL QT"] = df_total_general["CANTIDAD"] * df_total_general["LBS"]
 
-    st.metric(label="Peso Total Acumulado", value=f"{peso_total_quintales:,.2f} qq", delta=f"{peso_total_general:,.2f} lbs")
+        peso_total_general = df_total_general["TOTAL QT"].sum()
+        peso_total_quintales = peso_total_general / 100
 
-    if peso_total_general > 0:
-        st.info(f"🚚 **{motorista_seleccionado}** (Capacidad: {capacidad_quintales} qq) realizará la entrega en **{viajes_estimados} Viaje(s)**.")
+        st.metric(label="Peso Total Acumulado", value=f"{peso_total_quintales:,.2f} qq", delta=f"{peso_total_general:,.2f} lbs")
 
-st.markdown("---")
-st.markdown("### 📅 Reserva de Espacio en el Calendario")
+        if peso_total_general > 0:
+            st.info(f"🚚 **{motorista_seleccionado}** (Capacidad: {capacidad_quintales} qq) realizará la entrega en **{viajes_estimados} Viaje(s)**.")
 
-f_col1, f_col2 = st.columns(2)
-with f_col1:
-    fecha_registro = st.date_input("Fecha a Hacer el Viaje", key="widget_fecha_envio", on_change=actualizar_dia_por_fecha)
-with f_col2:
-    dia_envio = st.selectbox("Día de la semana", ["LUNES", "MARTES", "MIÉRCOLES", "JUEVES", "VIERNES", "SÁBADO"], key="widget_dia_envio", on_change=actualizar_fecha_por_dia)
+    st.markdown("---")
+    st.markdown("### 📅 Reserva de Espacio en el Calendario")
 
-nombre_hoja_actual = obtener_nombre_hoja_por_fecha(fecha_registro)
-matriz_temp = obtener_matriz_hoja(nombre_hoja_actual)
+    f_col1, f_col2 = st.columns(2)
+    with f_col1:
+        fecha_registro = st.date_input("Fecha a Hacer el Viaje", key="widget_fecha_envio", on_change=actualizar_dia_por_fecha)
+    with f_col2:
+        dia_envio = st.selectbox("Día de la semana", ["LUNES", "MARTES", "MIÉRCOLES", "JUEVES", "VIERNES", "SÁBADO"], key="widget_dia_envio", on_change=actualizar_fecha_por_dia)
 
-with st.form("form_envio"):
-    horarios_libres_opciones = []
-    horarios_para_revisar = ["8:00 a.m. (⭐ Viaje 1)", "10:00 a.m. (⭐ Viaje 2)"] if dia_envio == "SÁBADO" else HORARIOS_ESTRELLA
-    columnas_del_dia = mapa_dias_bloques.get(dia_envio, [])
+    nombre_hoja_actual = obtener_nombre_hoja_por_fecha(fecha_registro)
+    matriz_temp = obtener_matriz_hoja(nombre_hoja_actual)
 
-    for hora_b in horarios_para_revisar:
-        fila_meta_rev = mapa_filas.get(obtener_clave_fila(hora_b, dia_envio), 0)
-        row_idx_rev = fila_meta_rev - 1
-        espacios_libres_en_hora = 0
-        if matriz_temp and len(matriz_temp) > row_idx_rev:
-            for c_num in columnas_del_dia:
+    with st.form("form_envio"):
+        horarios_libres_opciones = []
+        horarios_para_revisar = ["8:00 a.m. (⭐ Viaje 1)", "10:00 a.m. (⭐ Viaje 2)"] if dia_envio == "SÁBADO" else HORARIOS_ESTRELLA
+        columnas_del_dia = mapa_dias_bloques.get(dia_envio, [])
+
+        for hora_b in horarios_para_revisar:
+            fila_meta_rev = mapa_filas.get(obtener_clave_fila(hora_b, dia_envio), 0)
+            row_idx_rev = fila_meta_rev - 1
+            espacios_libres_en_hora = 0
+            if matriz_temp and len(matriz_temp) > row_idx_rev:
+                for c_num in columnas_del_dia:
+                    try:
+                        val_celda = matriz_temp[row_idx_rev][c_num - 3]
+                    except IndexError:
+                        val_celda = ""
+                    if not es_reserva_real(val_celda): espacios_libres_en_hora += 1
+            else:
+                espacios_libres_en_hora = 5
+
+            if espacios_libres_en_hora > 0:
+                horarios_libres_opciones.append(f"{hora_b} (Disponibles: {espacios_libres_en_hora}/5)")
+
+        horario_seleccionado = st.selectbox("Seleccione Horario Disponible", horarios_libres_opciones) if horarios_libres_opciones else None
+        if not horarios_libres_opciones: st.warning(f"⚠️ No hay horarios disponibles para el día {dia_envio}.")
+
+        reservado_por = st.text_input("Nombre de Quien Reserva", key="reservado_por_input")
+        direccion_envio = st.text_input("Dirección de Destino / Entrega", key="direccion_input")
+
+        submitted = st.form_submit_button("🚀 Agendar Viajes y Guardar en el Sistema")
+
+        if submitted:
+            if peso_total_general == 0: st.warning("Debe seleccionar al menos un material.")
+            elif not reservado_por.strip(): st.warning("Debe indicar el nombre de quien reserva.")
+            elif not direccion_envio.strip(): st.warning("Debe indicar la dirección de destino.")
+            elif not horario_seleccionado: st.error("⚠️ Debe seleccionar un horario válido.")
+            else:
                 try:
-                    val_celda = matriz_temp[row_idx_rev][c_num - 3]
-                except IndexError:
-                    val_celda = ""
-                if not es_reserva_real(val_celda): espacios_libres_en_hora += 1
-        else:
-            espacios_libres_en_hora = 5
+                    matriz_datos = obtener_matriz_hoja(nombre_hoja_actual)
+                    columnas_dia = mapa_dias_bloques[dia_envio]
+                    hora_base_elegida = horario_seleccionado.split(" (Disponibles:")[0]
+                    idx_inicio = horarios_para_revisar.index(hora_base_elegida)
+                    
+                    horarios_a_reservar = [horarios_para_revisar[idx_inicio + i] for i in range(viajes_estimados)]
+                    espacios_totales_encontrados = []
 
-        if espacios_libres_en_hora > 0:
-            horarios_libres_opciones.append(f"{hora_b} (Disponibles: {espacios_libres_en_hora}/5)")
+                    for hora_b in horarios_a_reservar:
+                        fila_meta = mapa_filas[obtener_clave_fila(hora_b, dia_envio)]
+                        row_idx = fila_meta - 1
+                        col_encontrada = None
+                        for col_num in columnas_dia:
+                            val = matriz_datos[row_idx][col_num - 3] if matriz_datos and len(matriz_datos) > row_idx else ""
+                            if not es_reserva_real(val):
+                                col_encontrada = col_num
+                                break
+                        if col_encontrada: espacios_totales_encontrados.append((col_encontrada, fila_meta, hora_b))
 
-    horario_seleccionado = st.selectbox("Seleccione Horario Disponible", horarios_libres_opciones) if horarios_libres_opciones else None
-    if not horarios_libres_opciones: st.warning(f"⚠️ No hay horarios disponibles para el día {dia_envio}.")
+                    if len(espacios_totales_encontrados) < viajes_estimados:
+                        st.error("⚠️ Algunos de los horarios consecutivos seleccionados ya fueron ocupados.")
+                    else:
+                        color_rgb = COLORES_MOTORISTAS.get(motorista_seleccionado, {"red": 1.0, "green": 1.0, "blue": 1.0})
+                        for col_num, fila_meta, hora_b in espacios_totales_encontrados:
+                            actualizar_celda_hoja(f"{num_a_letra(col_num)}{fila_meta}", f"{motorista_seleccionado} ({reservado_por}) - Ocupado", color_rgb, nombre_hoja_actual)
 
-    reservado_por = st.text_input("Nombre de Quien Reserva", key="reservado_por_input")
-    direccion_envio = st.text_input("Dirección de Destino / Entrega", key="direccion_input")
+                        agregar_fila_hoja([
+                            motorista_seleccionado, f"{viajes_estimados} Viajes", reservado_por,
+                            f"{peso_total_quintales:,.2f} qq ({peso_total_general:,.2f} lbs)",
+                            fecha_registro.strftime("%Y-%m-%d"), direccion_envio
+                        ], nombre_hoja_actual)
 
-    submitted = st.form_submit_button("🚀 Agendar Viajes y Guardar en el Sistema")
+                        st.session_state.form_reset = True
+                        st.success(f"¡Se han agendado con éxito los {viajes_estimados} viajes en la hoja: {nombre_hoja_actual}!")
+                        st.rerun()
+                except Exception as e:
+                    st.error(f"Error al escribir en Google Drive: {e}")
 
-    if submitted:
-        if peso_total_general == 0: st.warning("Debe seleccionar al menos un material.")
-        elif not reservado_por.strip(): st.warning("Debe indicar el nombre de quien reserva.")
-        elif not direccion_envio.strip(): st.warning("Debe indicar la dirección de destino.")
-        elif not horario_seleccionado: st.error("⚠️ Debe seleccionar un horario válido.")
-        else:
-            try:
-                matriz_datos = obtener_matriz_hoja(nombre_hoja_actual)
-                columnas_dia = mapa_dias_bloques[dia_envio]
-                hora_base_elegida = horario_seleccionado.split(" (Disponibles:")[0]
-                idx_inicio = horarios_para_revisar.index(hora_base_elegida)
-                
-                horarios_a_reservar = [horarios_para_revisar[idx_inicio + i] for i in range(viajes_estimados)]
-                espacios_totales_encontrados = []
 
-                for hora_b in horarios_a_reservar:
-                    fila_meta = mapa_filas[obtener_clave_fila(hora_b, dia_envio)]
-                    row_idx = fila_meta - 1
-                    col_encontrada = None
-                    for col_num in columnas_dia:
-                        val = matriz_datos[row_idx][col_num - 3] if matriz_datos and len(matriz_datos) > row_idx else ""
-                        if not es_reserva_real(val):
-                            col_encontrada = col_num
-                            break
-                    if col_encontrada: espacios_totales_encontrados.append((col_encontrada, fila_meta, hora_b))
+# ==========================================
+# VISTA 2: DASHBOARD DE DISPONIBILIDAD (VENDEDORES)
+# ==========================================
+else:
+    fecha_consulta = st.sidebar.date_input("Semana a Consultar:", datetime.now().date())
+    nombre_hoja_dash = obtener_nombre_hoja_por_fecha(fecha_consulta)
 
-                if len(espacios_totales_encontrados) < viajes_estimados:
-                    st.error("⚠️ Algunos de los horarios consecutivos seleccionados ya fueron ocupados.")
+    st.markdown(f"<div class='main-header'>DASHBOARD DE LOGÍSTICA — {nombre_hoja_dash}</div>", unsafe_allow_html=True)
+
+    matriz_dash = obtener_matriz_hoja(nombre_hoja_dash)
+
+    total_viajes = 0
+    peso_total_qq = 0.0
+    df_historial = pd.DataFrame()
+
+    if matriz_dash and len(matriz_dash) >= 30:
+        filas_historial = matriz_dash[29:]
+        df_historial = pd.DataFrame(filas_historial).dropna(how="all")
+        if not df_historial.empty:
+            df_historial.columns = ["COL_A", "COL_B", "MOTORISTA", "CANT. VIAJES", "RESERVADO POR", "PESO TOTAL", "FECHA", "DIRECCION"] + [f"C_{i}" for i in range(len(df_historial.columns)-8)]
+            total_viajes = len(df_historial)
+            for val in df_historial["PESO TOTAL"]:
+                try:
+                    num_str = str(val).split("qq")[0].strip().replace(",", "")
+                    peso_total_qq += float(num_str)
+                except:
+                    pass
+
+    # Tarjetas métricas
+    col_m1, col_m2 = st.columns(2)
+    with col_m1:
+        st.markdown(f"<div class='metric-box'><span style='color: #64748b; font-size: 13px; font-weight: bold;'>TOTAL DE VIAJES</span><h2 style='color: #1f4e78; margin: 0;'>{total_viajes}</h2></div>", unsafe_allow_html=True)
+    with col_m2:
+        st.markdown(f"<div class='metric-box'><span style='color: #64748b; font-size: 13px; font-weight: bold;'>PESO TOTAL (QQ)</span><h2 style='color: #b91c1c; margin: 0;'>{peso_total_qq:.2f}</h2></div>", unsafe_allow_html=True)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # Pestañas por día con disponibilidad visual
+    st.markdown("#### 📅 Disponibilidad de Espacio por Día")
+    dias = ["LUNES", "MARTES", "MIÉRCOLES", "JUEVES", "VIERNES", "SÁBADO"]
+    tabs = st.tabs([f"📌 {d}" for d in dias])
+
+    for idx_dia, tab in enumerate(tabs):
+        nombre_dia = dias[idx_dia]
+        with tab:
+            st.caption(f"Horarios y cupos para el día **{nombre_dia}**")
+            
+            col_m, col_t = st.columns(2)
+            
+            with col_m:
+                st.markdown("##### 🌅 Mañana")
+                for h in ["8:00 a.m.", "10:00 a.m."]:
+                    st.markdown(f"<div class='time-slot'>⏱️ {h}</div>", unsafe_allow_html=True)
+                    c1, c2, c3, c4, c5 = st.columns(5)
+                    for c_idx, col in enumerate([c1, c2, c3, c4, c5]):
+                        with col:
+                            st.markdown(f"<div class='status-free'>Camión {c_idx+1}<br><small>Libre</small></div>", unsafe_allow_html=True)
+
+            with col_t:
+                st.markdown("##### 🌆 Tarde")
+                if nombre_dia != "SÁBADO":
+                    for h in ["2:30 p.m.", "4:30 p.m."]:
+                        st.markdown(f"<div class='time-slot'>⏱️ {h}</div>", unsafe_allow_html=True)
+                        c1, c2, c3, c4, c5 = st.columns(5)
+                        for c_idx, col in enumerate([c1, c2, c3, c4, c5]):
+                            with col:
+                                st.markdown(f"<div class='status-free'>Camión {c_idx+1}<br><small>Libre</small></div>", unsafe_allow_html=True)
                 else:
-                    color_rgb = COLORES_MOTORISTAS.get(motorista_seleccionado, {"red": 1.0, "green": 1.0, "blue": 1.0})
-                    for col_num, fila_meta, hora_b in espacios_totales_encontrados:
-                        actualizar_celda_hoja(f"{num_a_letra(col_num)}{fila_meta}", f"{motorista_seleccionado} ({reservado_por}) - Ocupado", color_rgb, nombre_hoja_actual)
+                    st.info("🚫 Tarde no laborable")
 
-                    agregar_fila_hoja([
-                        motorista_seleccionado, f"{viajes_estimados} Viajes", reservado_por,
-                        f"{peso_total_quintales:,.2f} qq ({peso_total_general:,.2f} lbs)",
-                        fecha_registro.strftime("%Y-%m-%d"), direccion_envio
-                    ], nombre_hoja_actual)
+    st.markdown("<br><hr>", unsafe_allow_html=True)
 
-                    st.session_state.form_reset = True
-                    st.success(f"¡Se han agendado con éxito los {viajes_estimados} viajes en la hoja: {nombre_hoja_actual}!")
-                    st.rerun()
-            except Exception as e:
-                st.error(f"Error al escribir en Google Drive: {e}")
+    # Tabla de despachos agendados
+    st.markdown("#### 📋 Despachos Agendados en la Semana")
+    if not df_historial.empty:
+        st.dataframe(
+            df_historial[["MOTORISTA", "CANT. VIAJES", "RESERVADO POR", "PESO TOTAL", "FECHA", "DIRECCION"]], 
+            use_container_width=True,
+            hide_index=True
+        )
+    else:
+        st.info("No hay fletes agendados aún para esta semana.")
